@@ -1,0 +1,12 @@
+fastapi==0.129.0
+uvicorn[standard]==0.41.0
+pydantic==2.12.5
+pydantic-settings==2.14.1
+joblib==1.5.3
+numpy==2.3.5
+pandas==2.2.3
+scikit-learn==1.8.0
+
+# test only (kept in the same file so the Docker build can run the suite)
+pytest==9.1.1
+httpx==0.28.1

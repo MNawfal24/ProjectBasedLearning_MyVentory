@@ -1,0 +1,30 @@
+.git
+.gitignore
+.dockerignore
+API/Dockerfile
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.venv
+**/venv
+**/.env
+**/.env.*
+**/*.log
+**/.DS_Store
+
+# Not needed at runtime: raw data and training scripts stay out of the image.
+ML/data
+ML/train
+ML/README.md
+
+# Frontend projects are out of scope for this API image.
+Web
+Mobile
+README.md
+docs
+
+# macOS / editor noise
+**/.idea
+**/.vscode
