@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:inventoy/app.dart';
+import 'package:myventory/app.dart';
 
 void main() {
   testWidgets('Myventory app loads correctly', (WidgetTester tester) async {
