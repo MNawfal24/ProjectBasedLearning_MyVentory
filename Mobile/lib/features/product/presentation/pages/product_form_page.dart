@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 
-import '../../data/mock_data.dart';
-import '../../models/product_model.dart';
-import '../../widgets/app_theme.dart';
+import '../../domain/entities/product.dart';
+import '../../../../widgets/app_theme.dart';
 
 class ProductFormPage extends StatefulWidget {
-  final InventoryStore store;
+  final List<Product>? products;
   final Product? product;
+  final Function(Product)? onSave;
 
   const ProductFormPage({
     super.key,
-    required this.store,
+    this.products,
     this.product,
+    this.onSave,
   });
 
   @override
@@ -82,10 +83,8 @@ class _ProductFormPageState extends State<ProductFormPage> {
       sellPrice: double.parse(sellPriceController.text.trim()),
     );
 
-    if (isEdit) {
-      widget.store.updateProduct(product);
-    } else {
-      widget.store.addProduct(product);
+    if (widget.onSave != null) {
+      widget.onSave!(product);
     }
 
     Navigator.pop(context);
@@ -140,9 +139,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               DropdownButtonFormField<String>(
                 value: category,
                 style: TextStyle(fontFamily: textFamily, color: AppTheme.textPrimary),
@@ -176,9 +173,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
                   }
                 },
               ),
-
               const SizedBox(height: 16),
-
               Row(
                 children: [
                   Expanded(
@@ -220,9 +215,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 16),
-
               DropdownButtonFormField<String>(
                 value: unit,
                 style: TextStyle(fontFamily: textFamily, color: AppTheme.textPrimary),
@@ -256,9 +249,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
                   }
                 },
               ),
-
               const SizedBox(height: 16),
-
               TextFormField(
                 controller: buyPriceController,
                 validator: requiredValidator,
@@ -276,9 +267,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               TextFormField(
                 controller: sellPriceController,
                 validator: requiredValidator,
@@ -296,9 +285,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 30),
-
               SizedBox(
                 width: double.infinity,
                 height: 52,
