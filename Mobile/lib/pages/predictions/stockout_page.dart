@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/mock_data.dart';
-import '../../models/product_model.dart';
+import '../../features/product/domain/entities/product.dart';
 import '../../widgets/app_theme.dart';
 
 class StockoutPage extends StatelessWidget {
