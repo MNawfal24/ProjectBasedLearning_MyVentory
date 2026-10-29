@@ -141,7 +141,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: category,
+                initialValue: category,
                 style: TextStyle(fontFamily: textFamily, color: AppTheme.textPrimary),
                 decoration: InputDecoration(
                   labelText: 'Category',
@@ -217,7 +217,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: unit,
+                initialValue: unit,
                 style: TextStyle(fontFamily: textFamily, color: AppTheme.textPrimary),
                 decoration: InputDecoration(
                   labelText: 'Unit',
