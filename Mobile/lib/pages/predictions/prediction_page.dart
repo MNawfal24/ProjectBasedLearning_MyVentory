@@ -226,7 +226,7 @@ class _PredictionPageState extends State<PredictionPage> {
               ),
               const SizedBox(height: 22),
               DropdownButtonFormField<Product>(
-                value: selectedProduct,
+                initialValue: selectedProduct,
                 decoration: InputDecoration(
                   labelText: 'Select Product',
                   labelStyle: TextStyle(
