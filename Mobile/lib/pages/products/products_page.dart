@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
 import '../../widgets/app_theme.dart';
 import '../../widgets/product_card.dart';
-import 'product_detail_page.dart';
-import 'product_form_page.dart';
+import '../../features/product/presentation/pages/product_detail_page.dart';
+import '../../features/product/presentation/pages/product_form_page.dart';
 
 class ProductsPage extends StatefulWidget {
   final InventoryStore store;
@@ -115,7 +115,11 @@ class _ProductsPageState extends State<ProductsPage> {
                             await Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => ProductFormPage(store: widget.store),
+                                builder: (_) => ProductFormPage(
+                                  onSave: (product) {
+                                    widget.store.addProduct(product);
+                                  },
+                                ),
                               ),
                             );
                           },
@@ -180,7 +184,7 @@ class _ProductsPageState extends State<ProductsPage> {
                             )
                           : ListView.separated(
                               itemCount: filteredProducts.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 10),
+                              separatorBuilder: (_, _) => const SizedBox(height: 10),
                               itemBuilder: (context, index) {
                                 final product = filteredProducts[index];
 
@@ -191,8 +195,10 @@ class _ProductsPageState extends State<ProductsPage> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (_) => ProductDetailPage(
-                                          store: widget.store,
-                                          productId: product.id,
+                                          product: product,
+                                          onSave: (updated) {
+                                            widget.store.updateProduct(updated);
+                                          },
                                         ),
                                       ),
                                     );

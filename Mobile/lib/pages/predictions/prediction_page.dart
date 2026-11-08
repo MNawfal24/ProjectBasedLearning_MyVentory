@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/mock_data.dart';
-import '../../models/product_model.dart';
+import '../../features/product/domain/entities/product.dart';
 import '../../widgets/app_theme.dart';
 import 'stockout_page.dart';
 
@@ -226,7 +226,7 @@ class _PredictionPageState extends State<PredictionPage> {
               ),
               const SizedBox(height: 22),
               DropdownButtonFormField<Product>(
-                value: selectedProduct,
+                initialValue: selectedProduct,
                 decoration: InputDecoration(
                   labelText: 'Select Product',
                   labelStyle: TextStyle(
