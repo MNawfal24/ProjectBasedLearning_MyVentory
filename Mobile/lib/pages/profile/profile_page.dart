@@ -5,10 +5,12 @@ import '../../widgets/app_theme.dart';
 
 class ProfilePage extends StatelessWidget {
   final InventoryStore store;
+  final VoidCallback onLogout;
 
   const ProfilePage({
     super.key,
     required this.store,
+    required this.onLogout,
   });
 
   @override
@@ -139,11 +141,41 @@ class ProfilePage extends StatelessWidget {
                   );
                 },
               ),
+              _MenuItem(
+                icon: Icons.logout,
+                title: 'Logout',
+                subtitle: 'Sign out of your account',
+                onTap: () => _confirmLogout(context),
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout == true) {
+      onLogout();
+    }
   }
 
   void _showInfoDialog(BuildContext context, String title, String message) {
