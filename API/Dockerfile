@@ -1,6 +1,7 @@
 # MyVentory Smart Inventory API - runtime image
-# Build dari root repository (konteks build harus root agar ML/artifacts ikut):
+# Build dari root repository:
 #   docker build -f API/Dockerfile -t myventory-api .
+# Artefak model tidak dibakar ke image; di-mount saat runtime (lihat docker-compose.yml).
 FROM python:3.12-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -14,11 +15,11 @@ WORKDIR /app
 COPY API/requirements.txt /app/API/requirements.txt
 RUN pip install --no-cache-dir -r /app/API/requirements.txt
 
-# Application code, the API tests, and the model artefacts needed at runtime.
+# Application code and the API tests. Model artefacts are provided by a mount.
 COPY API/app /app/API/app
 COPY API/tests /app/API/tests
 COPY API/pytest.ini /app/API/pytest.ini
-COPY ML/artifacts /app/ML/artifacts
+RUN mkdir -p /app/ML/artifacts
 
 # Non-root runtime user (uid/gid fixed so bind mounts stay predictable).
 RUN useradd --create-home --uid 10001 myventory && chown -R myventory:myventory /app
