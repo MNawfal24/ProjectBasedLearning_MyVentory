@@ -6,7 +6,7 @@ import '../../../../widgets/app_theme.dart';
 class ProductFormPage extends StatefulWidget {
   final List<Product>? products;
   final Product? product;
-  final Function(Product)? onSave;
+  final Future<void> Function(Product)? onSave;
 
   const ProductFormPage({
     super.key,
@@ -67,7 +67,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
     super.dispose();
   }
 
-  void saveProduct() {
+  Future<void> saveProduct() async {
     if (!formKey.currentState!.validate()) {
       return;
     }
@@ -84,18 +84,12 @@ class _ProductFormPageState extends State<ProductFormPage> {
     );
 
     if (widget.onSave != null) {
-      widget.onSave!(product);
+      await widget.onSave!(product);
     }
 
-    Navigator.pop(context);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isEdit ? 'Product updated successfully' : 'Product added successfully',
-        ),
-      ),
-    );
+    if (mounted) {
+      Navigator.pop(context, true);
+    }
   }
 
   String? requiredValidator(String? value) {

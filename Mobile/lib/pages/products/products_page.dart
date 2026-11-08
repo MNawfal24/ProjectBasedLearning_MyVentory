@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../data/mock_data.dart';
-import '../../widgets/app_theme.dart';
-import '../../widgets/product_card.dart';
-import '../../features/product/presentation/pages/product_detail_page.dart';
-import '../../features/product/presentation/pages/product_form_page.dart';
+import 'package:myventory/data/mock_data.dart';
+import 'package:myventory/widgets/app_theme.dart';
+import 'package:myventory/widgets/product_card.dart';
+import 'package:myventory/features/product/presentation/pages/product_detail_page.dart';
+import 'package:myventory/features/product/presentation/pages/product_form_page.dart';
 
 class ProductsPage extends StatefulWidget {
   final InventoryStore store;
@@ -24,6 +24,17 @@ class _ProductsPageState extends State<ProductsPage> {
   String selectedFilter = 'All';
 
   @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    await widget.store.load();
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
     searchController.dispose();
     super.dispose();
@@ -35,7 +46,7 @@ class _ProductsPageState extends State<ProductsPage> {
 
     return AnimatedBuilder(
       animation: widget.store,
-      builder: (context, _) {
+      builder: (context, __) {
         final search = searchController.text.toLowerCase();
 
         final filteredProducts = widget.store.products.where((product) {
@@ -115,13 +126,20 @@ class _ProductsPageState extends State<ProductsPage> {
                             await Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => ProductFormPage(
-                                  onSave: (product) {
-                                    widget.store.addProduct(product);
+                                builder: (__) => ProductFormPage(
+                                  onSave: (product) async {
+                                    await widget.store.addProduct(product);
                                   },
                                 ),
                               ),
                             );
+                            if (mounted && widget.store.error == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Produk disimpan.'),
+                                ),
+                              );
+                            }
                           },
                           icon: const Icon(Icons.add, size: 18),
                           label: Text(
@@ -134,7 +152,7 @@ class _ProductsPageState extends State<ProductsPage> {
                     const SizedBox(height: 20),
                     TextField(
                       controller: searchController,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (__) => setState(() {}),
                       style: TextStyle(fontFamily: textFamily),
                       decoration: InputDecoration(
                         hintText: 'Search products...',
@@ -184,7 +202,7 @@ class _ProductsPageState extends State<ProductsPage> {
                             )
                           : ListView.separated(
                               itemCount: filteredProducts.length,
-                              separatorBuilder: (_, _) => const SizedBox(height: 10),
+                              separatorBuilder: (a, b) => const SizedBox(height: 10),
                               itemBuilder: (context, index) {
                                 final product = filteredProducts[index];
 
@@ -194,12 +212,13 @@ class _ProductsPageState extends State<ProductsPage> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (_) => ProductDetailPage(
-                                          product: product,
-                                          onSave: (updated) {
-                                            widget.store.updateProduct(updated);
-                                          },
-                                        ),
+                                      builder: (__) => ProductDetailPage(
+                                        product: product,
+                                        store: widget.store,
+                                        onSave: (updated) async {
+                                          await widget.store.updateProduct(updated);
+                                        },
+                                      ),
                                       ),
                                     );
                                   },
@@ -232,7 +251,7 @@ class _ProductsPageState extends State<ProductsPage> {
         fontWeight: FontWeight.w600,
         fontFamily: textFamily,
       ),
-      onSelected: (_) {
+      onSelected: (__) {
         setState(() {
           selectedFilter = label;
         });

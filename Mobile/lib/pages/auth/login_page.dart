@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 
+import 'package:myventory/core/controllers/auth_controller.dart';
 import '../../widgets/app_theme.dart';
 
 class LoginPage extends StatefulWidget {
+  final AuthController auth;
   final VoidCallback onLoginSuccess;
 
-  const LoginPage({super.key, required this.onLoginSuccess});
+  const LoginPage({
+    super.key,
+    required this.auth,
+    required this.onLoginSuccess,
+  });
 
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
-  static const _demoEmail = 'admin@myventory.com';
-  static const _demoPassword = 'admin123';
-
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
@@ -31,19 +34,23 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 700));
+
+    final ok = await widget.auth.login(
+      _emailCtrl.text.trim(),
+      _passCtrl.text,
+    );
+
     if (!mounted) return;
 
-    final valid =
-        _emailCtrl.text.trim().toLowerCase() == _demoEmail &&
-        _passCtrl.text == _demoPassword;
-
-    if (valid) {
+    if (ok) {
       widget.onLoginSuccess();
     } else {
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email atau password salah')),
+        SnackBar(
+          content: Text(widget.auth.error ?? 'Email atau password salah.'),
+          backgroundColor: AppTheme.danger,
+        ),
       );
     }
   }
@@ -183,7 +190,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Demo: $_demoEmail / $_demoPassword',
+                    'Demo: admin@myventory.com / admin123',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppTheme.textSecondary,
