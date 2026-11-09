@@ -38,9 +38,9 @@ class ProductRemoteDataSource {
     return _productFromJson(response.data['data'] as Map<String, dynamic>);
   }
 
-  /// Perbarui produk (termasuk penyesuaian stok via StockLedger di server).
+  /// Perbarui produk (informasi produk tanpa mengubah saldo stok yang tercatat di ledger).
   Future<Product> updateProduct(Product product) async {
-    final response = await dio.patch('/products/${product.id}', data: _productToRequest(product));
+    final response = await dio.patch('/products/${product.id}', data: _updateProductToRequest(product));
     return _productFromJson(response.data['data'] as Map<String, dynamic>);
   }
 
@@ -115,6 +115,20 @@ class ProductRemoteDataSource {
       'is_active': product.isActive,
       'outlet_id': product.outletId,
       'stock': product.stock,
+      'min_stock': product.minStock,
+    };
+  }
+
+  Map<String, dynamic> _updateProductToRequest(Product product) {
+    return {
+      'name': product.name,
+      'sku': product.sku,
+      'category': product.category,
+      'unit': product.unit,
+      'sell_price': product.sellPrice,
+      'buy_price': product.buyPrice,
+      'is_active': product.isActive,
+      'outlet_id': product.outletId,
       'min_stock': product.minStock,
     };
   }

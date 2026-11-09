@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:myventory/core/network/api_client.dart';
 import 'package:myventory/features/product/domain/entities/product.dart';
 import 'package:myventory/injection_container.dart';
 
@@ -36,7 +37,7 @@ class InventoryStore extends ChangeNotifier {
         ..clear()
         ..addAll(sl.productRepository.products);
     } catch (e) {
-      _error = e.toString();
+      _error = ApiClient.errorFrom(e).message;
     } finally {
       _loading = false;
       notifyListeners();
@@ -44,11 +45,13 @@ class InventoryStore extends ChangeNotifier {
   }
 
   Product? getProductById(String id) {
-    try {
-      return sl.productRepository.products.firstWhere((product) => product.id == id);
-    } catch (_) {
-      return null;
+    for (final product in _products) {
+      if (product.id == id) return product;
     }
+    for (final product in sl.productRepository.products) {
+      if (product.id == id) return product;
+    }
+    return null;
   }
 
   /// Tambah produk baru (dan saldo stok awal jika diisi).
@@ -61,14 +64,14 @@ class InventoryStore extends ChangeNotifier {
       await load(outletId: product.outletId);
       _message = 'Produk ditambahkan.';
     } catch (e) {
-      _error = e.toString();
+      _error = ApiClient.errorFrom(e).message;
     } finally {
       _loading = false;
       notifyListeners();
     }
   }
 
-  /// Perbarui produk (termasuk penyesuaian stok melalui StockLedger di server).
+  /// Perbarui produk (informasi master produk tanpa menimpa saldo stok).
   Future<void> updateProduct(Product updatedProduct) async {
     _loading = true;
     _error = null;
@@ -78,7 +81,7 @@ class InventoryStore extends ChangeNotifier {
       await load(outletId: updatedProduct.outletId);
       _message = 'Produk diperbarui.';
     } catch (e) {
-      _error = e.toString();
+      _error = ApiClient.errorFrom(e).message;
     } finally {
       _loading = false;
       notifyListeners();
@@ -95,7 +98,7 @@ class InventoryStore extends ChangeNotifier {
       _products.removeWhere((product) => product.id == id);
       _message = 'Produk dihapus.';
     } catch (e) {
-      _error = e.toString();
+      _error = ApiClient.errorFrom(e).message;
     } finally {
       _loading = false;
       notifyListeners();
@@ -124,7 +127,7 @@ class InventoryStore extends ChangeNotifier {
       await load(outletId: outletId);
       _message = 'Pergerakan stok tercatat.';
     } catch (e) {
-      _error = e.toString();
+      _error = ApiClient.errorFrom(e).message;
     } finally {
       _loading = false;
       notifyListeners();
@@ -141,7 +144,7 @@ class InventoryStore extends ChangeNotifier {
       await load();
       _message = 'Batas minimum stok diperbarui.';
     } catch (e) {
-      _error = e.toString();
+      _error = ApiClient.errorFrom(e).message;
     } finally {
       _loading = false;
       notifyListeners();

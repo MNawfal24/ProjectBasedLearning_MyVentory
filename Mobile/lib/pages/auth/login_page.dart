@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:myventory/core/controllers/auth_controller.dart';
 import '../../widgets/app_theme.dart';
+import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
   final AuthController auth;
@@ -43,7 +44,11 @@ class _LoginPageState extends State<LoginPage> {
     if (!mounted) return;
 
     if (ok) {
+      if (mounted) setState(() => _loading = false);
       widget.onLoginSuccess();
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
     } else {
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -195,6 +200,36 @@ class _LoginPageState extends State<LoginPage> {
                       fontSize: 12,
                       color: AppTheme.textSecondary,
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Belum memiliki akun? ',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => RegisterPage(
+                                auth: widget.auth,
+                                onRegisterSuccess: () {
+                                  Navigator.pop(context);
+                                  widget.onLoginSuccess();
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Text('Daftar'),
+                      ),
+                    ],
                   ),
                 ],
               ),

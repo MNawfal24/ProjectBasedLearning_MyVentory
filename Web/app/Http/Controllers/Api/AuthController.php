@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\LoginRequest;
+use App\Http\Requests\Api\RegisterRequest;
 use App\Http\Resources\Api\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -30,6 +31,23 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
             'user' => new UserResource($user),
         ]);
+    }
+
+    public function register(RegisterRequest $request): JsonResponse
+    {
+        $user = User::create([
+            'name' => $request->string('name')->toString(),
+            'email' => $request->string('email')->toString(),
+            'password' => Hash::make($request->string('password')->toString()),
+        ]);
+
+        $token = $user->createToken($request->string('device_name', 'mobile')->toString())->plainTextToken;
+
+        return response()->json([
+            'token' => $token,
+            'token_type' => 'Bearer',
+            'user' => new UserResource($user),
+        ])->setStatusCode(201);
     }
 
     public function me(Request $request): UserResource

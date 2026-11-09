@@ -40,6 +40,12 @@ class AuthController extends ChangeNotifier {
     return ok;
   }
 
+  Future<bool> register(String name, String email, String password) async {
+    final ok = await repository.register(name, email, password);
+    notifyListeners();
+    return ok;
+  }
+
   Future<void> logout() async {
     await repository.logout();
     notifyListeners();

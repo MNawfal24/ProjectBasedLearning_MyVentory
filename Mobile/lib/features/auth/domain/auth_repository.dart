@@ -6,6 +6,7 @@ import '../data/auth_remote_datasource.dart';
 /// Kontrak repositori autentikasi.
 abstract class AuthRepository {
   Future<bool> login(String email, String password);
+  Future<bool> register(String name, String email, String password);
   Future<void> logout();
   Future<Map<String, dynamic>?> me();
   bool get isAuthenticated;
@@ -46,6 +47,30 @@ class AuthRepositoryImpl implements AuthRepository {
     _error = null;
     try {
       final data = await _remote.login(email: email, password: password);
+      _token = data['token'] as String?;
+      _user = data['user'] as Map<String, dynamic>?;
+      if (_token != null && _token!.isNotEmpty) {
+        await TokenStorage.write(_token!);
+      }
+      return true;
+    } catch (e) {
+      _error = ApiClient.errorFrom(e).message;
+      return false;
+    } finally {
+      _loading = false;
+    }
+  }
+
+  @override
+  Future<bool> register(String name, String email, String password) async {
+    _loading = true;
+    _error = null;
+    try {
+      final data = await _remote.register(
+        name: name,
+        email: email,
+        password: password,
+      );
       _token = data['token'] as String?;
       _user = data['user'] as Map<String, dynamic>?;
       if (_token != null && _token!.isNotEmpty) {

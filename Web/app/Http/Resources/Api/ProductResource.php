@@ -2,7 +2,9 @@
 
 namespace App\Http\Resources\Api;
 
+use App\Models\Outlet;
 use App\Models\Stock;
+use App\Services\StockLedger;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -12,6 +14,14 @@ class ProductResource extends JsonResource
     {
         /** @var Stock|null $stock */
         $stock = $this->relationLoaded('stocks') ? $this->stocks->first() : null;
+
+        if (! $stock) {
+            $outletId = (int) ($request->integer('outlet_id') ?: Outlet::query()->orderBy('id')->value('id'));
+            $outlet = Outlet::query()->find($outletId);
+            if ($outlet) {
+                $stock = app(StockLedger::class)->stockRow($outlet, $this->resource);
+            }
+        }
 
         return [
             'id' => $this->id,

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:myventory/core/app_state.dart';
 import 'data/mock_data.dart';
-import 'pages/auth/login_page.dart';
+import 'pages/auth/landing_page.dart';
 import 'pages/dashboard/dashboard_page.dart';
 import 'pages/products/products_page.dart';
 import 'pages/predictions/prediction_page.dart';
@@ -34,6 +34,8 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
+  late final InventoryStore _store = InventoryStore();
+
   @override
   void initState() {
     super.initState();
@@ -51,13 +53,12 @@ class _AuthGateState extends State<AuthGate> {
         }
 
         if (!authController.isAuthenticated) {
-          return LoginPage(
+          return LandingPage(
             auth: authController,
-            onLoginSuccess: () => setState(() {}),
           );
         }
 
-        return AppShell(store: InventoryStore());
+        return AppShell(store: _store);
       },
     );
   }
@@ -81,7 +82,11 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
-    widget.store.load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        widget.store.load();
+      }
+    });
   }
 
   Future<void> _handleLogout() async {

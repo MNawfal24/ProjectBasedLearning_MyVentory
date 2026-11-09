@@ -8,7 +8,7 @@ use App\Http\Requests\Api\UpdateProductRequest;
 use App\Http\Resources\Api\ProductResource;
 use App\Models\Outlet;
 use App\Models\Product;
-use App\Models\Stock;
+use App\Models\StockMovement;
 use App\Services\StockLedger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -104,34 +104,29 @@ class ProductController extends Controller
 
     private function applyStock(Outlet $outlet, Product $product, array $data, StockLedger $ledger): void
     {
-        if (array_key_exists('stock', $data) && $data['stock'] !== null) {
-            $current = (float) Stock::query()
-                ->where('outlet_id', $outlet->id)
-                ->where('product_id', $product->id)
-                ->value('quantity');
+        // Pastikan baris stok dasar untuk outlet ini selalu tersedia tanpa menimpa quantity.
+        $ledger->stockRow($outlet, $product);
 
-            $target = (float) $data['stock'];
-            $delta = $target - $current;
+        if (! array_key_exists('stock', $data) || $data['stock'] === null) {
+            return;
+        }
 
-            if (abs($delta) >= 0.005) {
-                $ledger->record(
-                    $outlet,
-                    $product,
-                    'adjustment',
-                    $delta,
-                    'product-form',
-                    'Penyesuaian stok dari form produk.',
-                );
-            } else {
-                Stock::firstOrCreate(
-                    ['outlet_id' => $outlet->id, 'product_id' => $product->id],
-                    ['quantity' => $current, 'min_quantity' => 0],
-                );
-            }
-        } else {
-            Stock::firstOrCreate(
-                ['outlet_id' => $outlet->id, 'product_id' => $product->id],
-                ['quantity' => 0, 'min_quantity' => 0],
+        $current = (float) StockMovement::query()
+            ->where('outlet_id', $outlet->id)
+            ->where('product_id', $product->id)
+            ->sum('quantity') ?? 0;
+
+        $target = (float) $data['stock'];
+        $delta = $target - $current;
+
+        if (abs($delta) >= 0.005) {
+            $ledger->record(
+                $outlet,
+                $product,
+                'adjustment',
+                $delta,
+                'product-form',
+                'Penyesuaian stok dari form produk.',
             );
         }
 
@@ -142,6 +137,13 @@ class ProductController extends Controller
 
     private function loadProduct(Product $product, ?int $outletId): Product
     {
+        if ($outletId) {
+            $outlet = Outlet::query()->find($outletId);
+            if ($outlet) {
+                app(StockLedger::class)->stockRow($outlet, $product);
+            }
+        }
+
         $product->loadSum('items as sold_quantity', 'quantity');
         $product->load(['stocks' => fn ($query) => $query->where('outlet_id', $outletId)]);
 

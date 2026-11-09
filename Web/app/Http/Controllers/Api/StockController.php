@@ -60,7 +60,7 @@ class StockController extends Controller
     public function store(StoreStockMovementRequest $request, StockLedger $ledger): JsonResponse
     {
         $data = $request->validated();
-        $outlet = Outlet::query()->findOrFail($data['outlet_id']);
+        $outlet = $this->resolveOutlet($data['outlet_id'] ?? null);
         $product = Product::query()->findOrFail($data['product_id']);
         $occurredAt = isset($data['occurred_at']) ? CarbonImmutable::parse($data['occurred_at']) : null;
 
@@ -143,5 +143,22 @@ class StockController extends Controller
             'message' => 'Saldo stok dihitung ulang.',
             'series' => $balances->count(),
         ]);
+    }
+
+    private function resolveOutlet(?int $outletId): Outlet
+    {
+        if ($outletId) {
+            return Outlet::query()->findOrFail($outletId);
+        }
+
+        $outlet = Outlet::query()->orderBy('id')->first();
+
+        if (! $outlet) {
+            throw ValidationException::withMessages([
+                'outlet_id' => ['Belum ada outlet. Jalankan seeder terlebih dahulu.'],
+            ]);
+        }
+
+        return $outlet;
     }
 }

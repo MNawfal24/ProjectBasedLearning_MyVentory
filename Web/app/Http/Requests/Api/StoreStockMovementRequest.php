@@ -15,7 +15,7 @@ class StoreStockMovementRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'outlet_id' => ['required', 'integer', Rule::exists('outlets', 'id')],
+            'outlet_id' => ['nullable', 'integer', Rule::exists('outlets', 'id')],
             'product_id' => [
                 'required',
                 'integer',
@@ -26,5 +26,15 @@ class StoreStockMovementRequest extends FormRequest
             'note' => ['nullable', 'string', 'max:255'],
             'occurred_at' => ['nullable', 'date'],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('outlet_id')) {
+            $val = $this->input('outlet_id');
+            $this->merge([
+                'outlet_id' => (filled($val) && is_numeric($val)) ? (int) $val : null,
+            ]);
+        }
     }
 }

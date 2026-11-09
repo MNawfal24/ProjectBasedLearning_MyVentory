@@ -26,7 +26,11 @@ class _ProductsPageState extends State<ProductsPage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _load();
+      }
+    });
   }
 
   Future<void> _load() async {
@@ -133,12 +137,22 @@ class _ProductsPageState extends State<ProductsPage> {
                                 ),
                               ),
                             );
-                            if (mounted && widget.store.error == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Produk disimpan.'),
-                                ),
-                              );
+                            if (mounted) {
+                              if (widget.store.error != null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(widget.store.error!),
+                                    backgroundColor: AppTheme.danger,
+                                  ),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(widget.store.message ?? 'Produk disimpan.'),
+                                    backgroundColor: AppTheme.secondary,
+                                  ),
+                                );
+                              }
                             }
                           },
                           icon: const Icon(Icons.add, size: 18),

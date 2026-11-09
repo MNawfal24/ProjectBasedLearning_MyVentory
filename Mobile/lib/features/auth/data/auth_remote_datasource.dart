@@ -20,6 +20,23 @@ class AuthRemoteDataSource {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Daftar akun baru dan ambil token + data pengguna.
+  Future<Map<String, dynamic>> register({
+    required String name,
+    required String email,
+    required String password,
+    String? deviceName,
+  }) async {
+    final response = await dio.post('/auth/register', data: {
+      'name': name,
+      'email': email,
+      'password': password,
+      'password_confirmation': password,
+      'device_name': deviceName ?? 'mobile',
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
   /// Keluar dan hapus token di server.
   Future<void> logout() async {
     await dio.post('/auth/logout');

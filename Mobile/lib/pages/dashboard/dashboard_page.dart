@@ -38,7 +38,11 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
-    _loadSummary();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadSummary();
+      }
+    });
   }
 
   Future<void> _loadSummary() async {

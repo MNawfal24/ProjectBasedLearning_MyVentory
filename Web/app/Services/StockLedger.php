@@ -49,17 +49,17 @@ class StockLedger
     public function refreshBalance(Outlet $outlet, Product $product): Stock
     {
         $stock = $this->stockRow($outlet, $product);
-        $balance = StockMovement::query()
+        $balance = (float) (StockMovement::query()
             ->where('outlet_id', $outlet->id)
             ->where('product_id', $product->id)
-            ->sum('quantity');
+            ->sum('quantity') ?? 0);
 
         $stock->update(['quantity' => $balance]);
 
         return $stock;
     }
 
-    private function stockRow(Outlet $outlet, Product $product): Stock
+    public function stockRow(Outlet $outlet, Product $product): Stock
     {
         return Stock::firstOrCreate(
             ['outlet_id' => $outlet->id, 'product_id' => $product->id],
@@ -69,6 +69,12 @@ class StockLedger
 
     private function signed(string $type, float $quantity): float
     {
-        return in_array($type, ['out', 'sale'], true) ? -abs($quantity) : $quantity;
+        if (in_array($type, ['out', 'sale'], true)) {
+            return -abs($quantity);
+        }
+        if ($type === 'in') {
+            return abs($quantity);
+        }
+        return $quantity;
     }
 }

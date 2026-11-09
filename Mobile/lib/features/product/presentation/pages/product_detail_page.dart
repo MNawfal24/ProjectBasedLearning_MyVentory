@@ -5,7 +5,7 @@ import 'package:myventory/features/product/domain/entities/product.dart';
 import 'package:myventory/widgets/app_theme.dart';
 import 'package:myventory/features/product/presentation/pages/product_form_page.dart';
 
-class ProductDetailPage extends StatelessWidget {
+class ProductDetailPage extends StatefulWidget {
   final Product product;
   final InventoryStore? store;
   final Future<void> Function(Product)? onSave;
@@ -17,29 +17,68 @@ class ProductDetailPage extends StatelessWidget {
     this.onSave,
   });
 
+  @override
+  State<ProductDetailPage> createState() => _ProductDetailPageState();
+}
+
+class _ProductDetailPageState extends State<ProductDetailPage> {
+  late Product _product;
+
+  @override
+  void initState() {
+    super.initState();
+    _product = widget.product;
+  }
+
+  Product get currentProduct =>
+      widget.store?.getProductById(_product.id) ?? _product;
+
   String currency(double value) {
     return 'Rp ${value.toStringAsFixed(0)}';
   }
 
   Future<void> _edit(BuildContext context) async {
+    final fresh = currentProduct;
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ProductFormPage(
-          product: product,
-          onSave: onSave,
+          product: fresh,
+          onSave: (updated) async {
+            if (widget.onSave != null) {
+              await widget.onSave!(updated);
+              if (mounted) {
+                if (widget.store?.error != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(widget.store!.error!),
+                      backgroundColor: AppTheme.danger,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Produk berhasil diperbarui.'),
+                      backgroundColor: AppTheme.secondary,
+                    ),
+                  );
+                }
+              }
+            }
+          },
         ),
       ),
     );
   }
 
   Future<void> _confirmDelete(BuildContext context) async {
-    if (store == null) return;
+    if (widget.store == null) return;
+    final prod = currentProduct;
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Hapus Produk?'),
-        content: Text('Produk ${product.name} akan dihapus dari server.'),
+        content: Text('Produk ${prod.name} akan dihapus dari server.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -53,14 +92,32 @@ class ProductDetailPage extends StatelessWidget {
         ],
       ),
     );
-    if (ok == true && context.mounted) {
-      await store!.deleteProduct(product.id);
-      if (context.mounted) Navigator.pop(context, true);
+    if (ok == true && mounted) {
+      await widget.store!.deleteProduct(prod.id);
+      if (!mounted) return;
+
+      if (widget.store!.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.store!.error!),
+            backgroundColor: AppTheme.danger,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Produk ${prod.name} berhasil dihapus.'),
+            backgroundColor: AppTheme.secondary,
+          ),
+        );
+        Navigator.pop(context, true);
+      }
     }
   }
 
   Future<void> _adjustStock(BuildContext context, String type) async {
-    if (store == null) return;
+    if (widget.store == null) return;
+    final prod = currentProduct;
     final qtyCtrl = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
@@ -70,7 +127,7 @@ class ProductDetailPage extends StatelessWidget {
           controller: qtyCtrl,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
-            labelText: 'Jumlah (${product.unit})',
+            labelText: 'Jumlah (${prod.unit})',
           ),
         ),
         actions: [
@@ -85,22 +142,64 @@ class ProductDetailPage extends StatelessWidget {
         ],
       ),
     );
-    if (ok == true && context.mounted) {
+    if (ok == true && mounted) {
       final quantity = double.tryParse(qtyCtrl.text.trim()) ?? 0;
-      if (quantity <= 0) return;
-      await store!.adjustStock(
-        outletId: product.outletId ?? '',
-        productId: product.id,
+      if (quantity <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Jumlah harus lebih dari nol.'),
+            backgroundColor: AppTheme.danger,
+          ),
+        );
+        return;
+      }
+
+      await widget.store!.adjustStock(
+        outletId: prod.outletId ?? '',
+        productId: prod.id,
         type: type,
         quantity: quantity,
         note: 'Penyesuaian dari detail produk',
       );
+
+      if (!mounted) return;
+
+      if (widget.store!.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.store!.error!),
+            backgroundColor: AppTheme.danger,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              type == 'in'
+                  ? 'Stok masuk berhasil dicatat.'
+                  : 'Stok keluar berhasil dicatat.',
+            ),
+            backgroundColor: AppTheme.secondary,
+          ),
+        );
+      }
     }
   }
 
   Future<void> _setMinStock(BuildContext context) async {
-    if (store == null || product.stockId == null) return;
-    final qtyCtrl = TextEditingController(text: product.minStock.toString());
+    if (widget.store == null) return;
+    final prod = currentProduct;
+    if (prod.stockId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Identitas stok belum tersedia.'),
+          backgroundColor: AppTheme.danger,
+        ),
+      );
+      return;
+    }
+
+    final qtyCtrl = TextEditingController(text: prod.minStock.toString());
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -122,16 +221,42 @@ class ProductDetailPage extends StatelessWidget {
         ],
       ),
     );
-    if (ok == true && context.mounted) {
-      await store!.setMinStock(
-        product.stockId!,
-        double.tryParse(qtyCtrl.text.trim()) ?? 0,
-      );
+    if (ok == true && mounted) {
+      final minQuantity = double.tryParse(qtyCtrl.text.trim()) ?? 0;
+      await widget.store!.setMinStock(prod.stockId!, minQuantity);
+
+      if (!mounted) return;
+
+      if (widget.store!.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.store!.error!),
+            backgroundColor: AppTheme.danger,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Batas minimum stok berhasil diperbarui.'),
+            backgroundColor: AppTheme.secondary,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.store != null) {
+      return AnimatedBuilder(
+        animation: widget.store!,
+        builder: (context, _) => _buildScaffold(context, currentProduct),
+      );
+    }
+    return _buildScaffold(context, currentProduct);
+  }
+
+  Widget _buildScaffold(BuildContext context, Product product) {
     final bool isOutOfStock = product.stock == 0;
     final bool isLowStock = !isOutOfStock && product.isLowStock;
 
@@ -153,7 +278,7 @@ class ProductDetailPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Product Detail'),
         actions: [
-          if (store != null)
+          if (widget.store != null)
             IconButton(
               icon: const Icon(Icons.delete_outline, color: AppTheme.danger),
               onPressed: () => _confirmDelete(context),
@@ -170,7 +295,7 @@ class ProductDetailPage extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            _buildHeader(stockLabel, stockColor, isOutOfStock),
+            _buildHeader(product, stockLabel, stockColor, isOutOfStock),
             const SizedBox(height: 15),
             Row(
               children: [
@@ -192,16 +317,16 @@ class ProductDetailPage extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 15),
-            _buildPriceCard(),
+            _buildPriceCard(product),
             const SizedBox(height: 15),
-            _buildActionButtons(context),
+            _buildActionButtons(context, product),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(String stockLabel, Color stockColor, bool isOutOfStock) {
+  Widget _buildHeader(Product product, String stockLabel, Color stockColor, bool isOutOfStock) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(25),
@@ -251,7 +376,7 @@ class ProductDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildPriceCard() {
+  Widget _buildPriceCard(Product product) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -275,7 +400,7 @@ class ProductDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButtons(BuildContext context) {
+  Widget _buildActionButtons(BuildContext context, Product product) {
     return Column(
       children: [
         SizedBox(

@@ -94,6 +94,85 @@ class ApiIntegrationTest extends TestCase
         $this->assertSame(0, Product::query()->whereKey($id)->count());
     }
 
+    public function test_product_info_update_without_stock_preserves_stock_balance(): void
+    {
+        $token = $this->token();
+        $headers = ['Authorization' => "Bearer {$token}"];
+
+        $outlet = Outlet::query()->create(['code' => 'SHOP001', 'name' => 'Main']);
+
+        $created = $this->postJson('/api/v1/products', [
+            'name' => 'Robusta Special',
+            'unit' => 'Kg',
+            'sell_price' => 45000,
+            'buy_price' => 25000,
+            'stock' => 15,
+            'min_stock' => 5,
+            'outlet_id' => $outlet->id,
+        ], $headers)->assertCreated();
+
+        $id = $created->json('data.id');
+
+        // Edit product master info WITHOUT sending 'stock'
+        $updated = $this->patchJson("/api/v1/products/{$id}", [
+            'name' => 'Robusta Special Edition',
+            'sell_price' => 48000,
+        ], $headers)->assertOk();
+
+        // Stock balance MUST remain 15, not reset to 0 or changed
+        $this->assertSame(15.0, (float) $updated->json('data.stock'));
+        $this->assertSame('Robusta Special Edition', $updated->json('data.name'));
+        $this->assertSame(48000.0, (float) $updated->json('data.sell_price'));
+    }
+
+    public function test_stock_movement_without_outlet_id_falls_back_to_default_outlet(): void
+    {
+        $token = $this->token();
+        $headers = ['Authorization' => "Bearer {$token}"];
+
+        $outlet = Outlet::query()->create(['code' => 'SHOP001', 'name' => 'Main']);
+        $product = Product::query()->create([
+            'name' => 'Liberica',
+            'unit' => 'Kg',
+            'sell_price' => 60000,
+        ]);
+
+        // Post movement with outlet_id omitted
+        $movement = $this->postJson('/api/v1/stocks/movements', [
+            'product_id' => $product->id,
+            'type' => 'in',
+            'quantity' => 10,
+        ], $headers)->assertCreated();
+
+        $this->assertSame(10.0, (float) $movement->json('stock.quantity'));
+        $this->assertSame($outlet->id, $movement->json('stock.outlet_id'));
+    }
+
+    public function test_stock_minimum_can_be_updated_directly(): void
+    {
+        $token = $this->token();
+        $headers = ['Authorization' => "Bearer {$token}"];
+
+        $outlet = Outlet::query()->create(['code' => 'SHOP001', 'name' => 'Main']);
+        $product = Product::query()->create([
+            'name' => 'Toraja',
+            'unit' => 'Kg',
+            'sell_price' => 70000,
+        ]);
+
+        $created = $this->getJson('/api/v1/products/'.$product->id, $headers)->assertOk();
+        $stockId = $created->json('data.stock_id');
+        $this->assertNotNull($stockId);
+
+        $this->patchJson("/api/v1/stocks/{$stockId}", [
+            'min_quantity' => 8,
+        ], $headers)->assertOk()->assertJsonPath('data.min_quantity', 8);
+
+        $this->getJson('/api/v1/products/'.$product->id, $headers)
+            ->assertOk()
+            ->assertJsonPath('data.min_stock', 8);
+    }
+
     public function test_transaction_sale_and_void_restore_stock(): void
     {
         $token = $this->token();
