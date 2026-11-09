@@ -1,0 +1,43 @@
+.git
+.gitignore
+.dockerignore
+API/Dockerfile
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.venv
+**/venv
+**/.env
+**/.env.*
+**/*.log
+**/.DS_Store
+
+# Training scripts and side data stay out; only the exported receipts are needed,
+# because the web image seeds its database from them.
+ML/data/*
+!ML/data/Transactions.csv
+ML/train
+ML/README.md
+
+# The Flutter app is not part of either image.
+Mobile
+
+# Web build inputs and local state; vendor and assets are produced inside the build.
+Web/node_modules
+Web/vendor
+Web/public/build
+Web/public/hot
+Web/storage/logs
+Web/storage/framework
+Web/storage/app
+Web/database/database.sqlite
+Web/.phpunit.result.cache
+
+README.md
+docs
+
+# macOS / editor noise
+**/.idea
+**/.vscode

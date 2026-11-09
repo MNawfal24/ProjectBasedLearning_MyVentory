@@ -1,0 +1,102 @@
+name: myventory
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-myventory}
+      POSTGRES_USER: ${DB_USERNAME:-myventory}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-myventory}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./docker/db/init-test-database.sql:/docker-entrypoint-initdb.d/10-test-database.sql:ro
+    ports:
+      - "${DB_PORT_FORWARD:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-myventory} -d ${DB_DATABASE:-myventory}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      # Crash recovery can take a few seconds on a large volume; without a start
+      # period the first failed probe marks the database unhealthy and blocks web.
+      start_period: 30s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+      # Without an explicit target Docker builds the last stage, which is the test image.
+      target: runtime
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_NAME: MyVentory
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      APP_KEY: ${APP_KEY:-}
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_DATABASE: ${DB_DATABASE:-myventory}
+      DB_USERNAME: ${DB_USERNAME:-myventory}
+      DB_PASSWORD: ${DB_PASSWORD:-myventory}
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: sync
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: warning
+      MYVENTORY_SEED: ${MYVENTORY_SEED:-true}
+      MYVENTORY_SEED_CSV: database/data/Transactions.csv
+      # Internal ML service. Start it with `docker compose --profile api up -d`;
+      # prediction routes answer 503 while it is down.
+      ML_API_URL: http://api:8000/api/v1
+      ML_TIMEOUT: "10"
+    volumes:
+      - web-storage:/var/www/html/storage
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    restart: unless-stopped
+
+  # Test runner against the same postgres instance, in a throwaway database:
+  #   docker compose --profile test run --rm test
+  test:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+      target: testing
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_ENV: testing
+      APP_KEY: base64:bXl2ZW50b3J5LXRlc3RpbmctYXBwLWtleS0zMmJ5dGU=
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_DATABASE: myventory_test
+      DB_USERNAME: ${DB_USERNAME:-myventory}
+      DB_PASSWORD: ${DB_PASSWORD:-myventory}
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+
+  api:
+    profiles: ["api"]
+    build:
+      context: .
+      dockerfile: API/Dockerfile
+    volumes:
+      # Model artefacts are not committed; mount them read-only from the host.
+      - ./ML/artifacts:/app/ML/artifacts:ro
+    ports:
+      - "${API_PORT:-8000}:8000"
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  web-storage:
