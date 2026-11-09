@@ -28,32 +28,36 @@ const periods = [
     { days: 365, label: '1 tahun' },
 ];
 
-const compareLabel = computed(() => `vs ${props.stats.period.days} hari sebelumnya`);
+const compareLabel = computed(
+    () => `vs ${props.stats.period.previous_from} sampai ${props.stats.period.previous_to}`,
+);
+
+const compare = (changePct) => (changePct === null ? 'Tidak ada data pembanding' : compareLabel.value);
 
 const kpis = computed(() => [
     {
         label: 'Penjualan bersih',
         value: formatCurrency(props.stats.kpis.revenue.value),
         change_pct: props.stats.kpis.revenue.change_pct,
-        compare: compareLabel.value,
+        compare: compare(props.stats.kpis.revenue.change_pct),
     },
     {
         label: 'Transaksi',
         value: formatNumber(props.stats.kpis.transactions.value),
         change_pct: props.stats.kpis.transactions.change_pct,
-        compare: compareLabel.value,
+        compare: compare(props.stats.kpis.transactions.change_pct),
     },
     {
         label: 'Rata-rata per struk',
         value: formatCurrency(props.stats.kpis.average_basket.value),
         change_pct: props.stats.kpis.average_basket.change_pct,
-        compare: compareLabel.value,
+        compare: compare(props.stats.kpis.average_basket.change_pct),
     },
     {
         label: 'Item terjual',
         value: formatNumber(props.stats.kpis.items_sold.value),
         change_pct: props.stats.kpis.items_sold.change_pct,
-        compare: compareLabel.value,
+        compare: compare(props.stats.kpis.items_sold.change_pct),
     },
 ]);
 
@@ -87,6 +91,9 @@ const topProducts = computed(() =>
                 <h1 class="text-2xl font-semibold tracking-tight text-ink">Overview</h1>
                 <p class="mt-1 text-sm text-muted">
                     Penjualan {{ stats.period.from }} sampai {{ stats.period.to }} · {{ stats.inventory.products }} produk aktif
+                </p>
+                <p v-if="stats.data_range.from" class="mt-1 text-xs text-muted">
+                    Data tersedia {{ stats.data_range.from }} sampai {{ stats.data_range.to }}
                 </p>
             </div>
 
@@ -217,7 +224,10 @@ const topProducts = computed(() =>
                 <p class="numeric text-xl font-semibold text-ink">{{ formatCurrency(stats.last_sale.revenue) }}</p>
                 <p class="mt-1 text-xs text-muted">{{ formatNumber(stats.last_sale.transactions) }} struk</p>
             </Panel>
-            <Panel title="Unit di gudang" hint="Saldo seluruh outlet pada saat ini.">
+            <Panel
+                title="Unit di gudang"
+                :hint="stats.inventory.as_of ? `Saldo per ${stats.inventory.as_of}.` : 'Belum ada pergerakan stok.'"
+            >
                 <p class="numeric text-xl font-semibold text-ink">{{ formatNumber(stats.inventory.units_on_hand) }}</p>
                 <p class="mt-1 text-xs text-muted">{{ stats.inventory.products }} produk · {{ stats.inventory.outlets }} outlet</p>
             </Panel>

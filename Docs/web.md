@@ -23,7 +23,7 @@ diduplikasi.
 | `/login`, `/logout` | Masuk dan keluar. Hanya akun `admin` yang diterima. |
 | `/dashboard` | KPI periode dengan pembanding periode sebelumnya, tren harian, jam tersibuk, pola hari, metode pembayaran, produk terlaris, transaksi terakhir, stok menipis |
 | `/transactions` | Daftar struk dengan pencarian, filter outlet/pembayaran/tanggal, dan form catat penjualan |
-| `/stock` | Saldo per outlet x produk, status aman/menipis/habis, pergerakan stok, dan form ubah batas minimum |
+| `/stock` | Grafik batang mendatar komposisi status per outlet (aman/menipis/habis), tabel saldo per outlet x produk dengan filter outlet dan status di judul kolom, pergerakan stok, dan form ubah batas minimum |
 | `/products` | Katalog produk yang dipakai form penjualan |
 | `/users` | Akun staf mobile: buat akun dan reset kata sandi |
 
@@ -81,15 +81,18 @@ Web/
 │   └── Components/                 komponen UI dan grafik
 ├── database/
 │   ├── migrations/                 skema, termasuk users.role
-│   └── seeders/                    impor CSV dan akun admin
+│   └── seeders/                    impor transaksi, impor stok, akun admin
 └── tests/Feature/                  tes rute, stok, transaksi, peran, API
 ```
 
 ## Service yang menentukan angka
 
-- **StockLedger** satu-satunya tempat saldo stok berubah. Setiap perubahan
-  menambah satu `stock_movement`, lalu saldo pada tabel `stocks` dihitung ulang
-  dari jumlah seluruh pergerakan, sehingga keduanya tidak bisa berbeda.
+- **StockLedger** satu-satunya tempat saldo stok berubah saat aplikasi melayani
+  pengguna. Setiap perubahan menambah satu `stock_movement`, lalu saldo pada tabel
+  `stocks` dihitung ulang dari jumlah seluruh pergerakan, sehingga keduanya tidak
+  bisa berbeda. Satu-satunya pengecualian adalah `StockImportSeeder`, yang menulis
+  pergerakan hasil impor secara massal lalu memverifikasi saldo setiap seri harus
+  sama dengan `ClosingStock` hari terakhir.
 - **SalesRecorder** mencatat penjualan: header struk, baris item, dan pergerakan
   stok keluar. Pajak 11% mengikuti rasio struk hasil impor.
 - **DashboardStats** menghitung seluruh KPI dari tabel, tanpa angka contoh.
@@ -111,6 +114,32 @@ Web/
 | `transaction_items` | Baris produk pada struk |
 | `personal_access_tokens` | Token Sanctum milik aplikasi mobile |
 
+## Sumber data
+
+Tidak ada angka contoh dan tidak ada turunan yang dikarang. Dua berkas mengisi
+database, dan keduanya diimpor apa adanya.
+
+| Seeder | Berkas | Yang ditulis |
+|---|---|---|
+| `TransactionImportSeeder` | `Transactions.csv` | outlet, produk, struk, baris item |
+| `StockImportSeeder` | `Stock.csv` + `ItemMaster.csv` | `stock_movements`, saldo `stocks` |
+
+- Tanggal, jam, nomor struk, metode bayar, `NetSales`, `Tax`, `TotalAmount` dan
+  `TotalItem` disalin langsung. Tanggal tidak digeser.
+- `sell_price` hanya diisi bila ada struk berisi satu item: di situ `NetSales`
+  adalah harga item itu sendiri. Produk tanpa struk satu item dibiarkan `0` dan
+  diisi lewat menu Produk.
+- `category` tidak ada di sumber, jadi `null`. `sku` diambil dari `ItemMaster.csv`.
+- `StockImportSeeder` menolak impor bila `OpeningStock + StockIn - StockOut`
+  tidak sama dengan `ClosingStock`, bila `OpeningStock` sebuah hari tidak sama
+  dengan `ClosingStock` hari sebelumnya, bila ada tanggal ganda, atau bila
+  `ItemID`/nama produk tidak dikenal. Lebih baik gagal daripada menyimpan saldo
+  yang saling bertentangan.
+- `MinimumStock` hanya punya satu kolom di skema, jadi nilai hari terakhir setiap
+  seri yang disimpan.
+- Saldo stok adalah keadaan pada tanggal pergerakan terakhir, bukan hitungan hari
+  ini. Halaman Stok dan panel "Unit di gudang" menampilkan tanggal itu.
+
 ## Konfigurasi
 
 | Variabel | Default | Keterangan |
@@ -119,7 +148,9 @@ Web/
 | `DB_*` | `myventory` | koneksi PostgreSQL |
 | `SESSION_DRIVER` | `database` | sesi dashboard |
 | `MYVENTORY_SEED` | `true` | impor CSV saat boot pertama |
-| `MYVENTORY_SEED_CSV` | `database/data/Transactions.csv` | sumber impor |
+| `MYVENTORY_SEED_CSV` | `database/data/Transactions.csv` | sumber impor transaksi |
+| `MYVENTORY_STOCK_CSV` | `database/data/Stock.csv` | sumber impor stok |
+| `MYVENTORY_ITEM_MASTER_CSV` | `database/data/ItemMaster.csv` | peta ItemID ke produk |
 | `MYVENTORY_ADMIN_EMAIL` | `admin@myventory.com` | akun admin seeder |
 | `MYVENTORY_ADMIN_PASSWORD` | `admin123` | kata sandi awal admin |
 | `ML_API_URL` | `http://api:8000/api/v1` | alamat FastAPI |

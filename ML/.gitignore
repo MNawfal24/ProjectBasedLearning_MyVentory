@@ -13,5 +13,7 @@ venv/
 
 data/*
 !data/Transactions.csv
+!data/Stock.csv
+!data/ItemMaster.csv
 artifacts/
 train/

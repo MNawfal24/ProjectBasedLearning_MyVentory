@@ -34,6 +34,8 @@ export function useChartColors() {
             line: read('--color-line', '#e2e8f2'),
             surface: read('--color-surface', '#ffffff'),
             primary: read('--color-primary', '#1e5aef'),
+            accent: read('--color-accent', '#a14a08'),
+            danger: read('--color-danger', '#b91c1c'),
         };
     });
 }

@@ -1,6 +1,6 @@
-# MyVentory web dashboard: Laravel + Vue, served by Apache with mod_php.
+﻿# MyVentory web dashboard: Laravel + Vue, served by Apache with mod_php.
 # Build from the repository root so the Dockerfile can reach Web/ and the CSV:
-#   docker build -f docker/web/Dockerfile -t myventory-web .
+#   docker build -f Docker/web/Dockerfile -t myventory-web .
 #
 # Stages:
 #   assets  - builds the Vite bundle
@@ -42,14 +42,15 @@ FROM base AS runtime
 RUN composer install --no-dev --no-interaction --prefer-dist --no-scripts --no-autoloader
 COPY Web/ .
 COPY --from=assets /app/public/build ./public/build
-# Seed source for the demo dataset; the seeder skips it when transactions exist.
-COPY ML/data/Transactions.csv ./database/data/Transactions.csv
+# Seed sources for the real dataset: receipts, stock ledger and item master.
+# The directory copy keeps the build working when Stock.csv is not committed yet.
+COPY ML/data/ ./database/data/
 RUN composer dump-autoload --optimize --no-dev \
     && php artisan package:discover --ansi \
     && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R a+rX /var/www/html
-COPY docker/web/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY Docker/web/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 80
@@ -71,3 +72,4 @@ RUN touch .env \
     && php artisan package:discover --ansi \
     && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
 CMD ["php", "artisan", "test"]
+

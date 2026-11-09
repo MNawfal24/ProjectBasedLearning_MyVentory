@@ -6,9 +6,11 @@ use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\Stock;
 use App\Models\StockMovement;
+use App\Services\DashboardStats;
 use App\Services\StockLedger;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -16,15 +18,17 @@ use Inertia\Response;
 
 class StockController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request, DashboardStats $stats): Response
     {
+        $outletId = $request->integer('outlet') ?: null;
+        $status = $request->string('status')->toString();
+
         $query = Stock::query()->with(['outlet:id,code', 'product:id,name,unit,sku']);
 
-        if ($outletId = $request->integer('outlet')) {
+        if ($outletId) {
             $query->where('outlet_id', $outletId);
         }
 
-        $status = $request->string('status')->toString();
         if ($status === 'low') {
             $query->whereColumn('quantity', '<=', 'min_quantity')->where('quantity', '>', 0);
         } elseif ($status === 'out') {
@@ -32,6 +36,15 @@ class StockController extends Controller
         }
 
         $rows = $query->orderBy('quantity')->paginate(25)->withQueryString();
+
+        // Aggregates come from the outlet scope only: a chart limited to one status
+        // would show a single bar and say nothing.
+        $overview = $this->overview(
+            Stock::query()
+                ->with('outlet:id,code')
+                ->when($outletId, fn ($builder) => $builder->where('outlet_id', $outletId))
+                ->get(),
+        );
 
         return Inertia::render('Stock/Index', [
             'stocks' => $rows->through(fn (Stock $stock) => [
@@ -61,18 +74,50 @@ class StockController extends Controller
                     'occurred_at' => $movement->occurred_at->toIso8601String(),
                 ]),
             'filters' => [
-                'outlet' => $request->integer('outlet') ?: null,
+                'outlet' => $outletId,
                 'status' => $status,
             ],
             'outlets' => Outlet::query()->orderBy('code')->get(['id', 'code']),
+            // The balance is a snapshot of the newest recorded movement, not a live count.
+            'as_of' => $stats->stockAsOf($outletId),
             'products' => Product::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'sku', 'unit']),
-            'summary' => [
-                'series' => Stock::query()->count(),
-                'low' => Stock::query()->whereColumn('quantity', '<=', 'min_quantity')->where('quantity', '>', 0)->count(),
-                'out' => Stock::query()->where('quantity', '<=', 0)->count(),
-                'units' => (float) Stock::query()->sum('quantity'),
-            ],
+            'summary' => $overview['summary'],
+            'chart' => ['status' => $overview['status']],
         ]);
+    }
+
+    /**
+     * Status counts and unit totals for the current outlet scope. Grouped in PHP so
+     * the result is identical on sqlite and postgres.
+     *
+     * @param  Collection<int, Stock>  $stocks
+     */
+    private function overview(Collection $stocks): array
+    {
+        $status = [];
+        $summary = ['series' => 0, 'safe' => 0, 'low' => 0, 'out' => 0, 'units' => 0.0];
+
+        foreach ($stocks as $stock) {
+            $quantity = (float) $stock->quantity;
+            $bucket = $quantity <= 0 ? 'out' : ($quantity <= (float) $stock->min_quantity ? 'low' : 'safe');
+            $code = $stock->outlet->code;
+
+            $status[$code] ??= ['outlet' => $code, 'safe' => 0, 'low' => 0, 'out' => 0];
+            $status[$code][$bucket]++;
+
+            $summary['series']++;
+            $summary[$bucket]++;
+            $summary['units'] += $quantity;
+        }
+
+        ksort($status);
+
+        $summary['units'] = round($summary['units'], 2);
+
+        return [
+            'status' => array_values($status),
+            'summary' => $summary,
+        ];
     }
 
     public function store(Request $request, StockLedger $ledger)

@@ -9,7 +9,9 @@ melayani pengguna.
 ```
 ML/
 ├── data/
-│   └── Transactions.csv        ekspor kasir 53.820 struk
+│   ├── Transactions.csv        ekspor kasir 53.820 struk
+│   ├── Stock.csv               ledger stok harian per outlet x item
+│   └── ItemMaster.csv          ItemID -> nama produk
 ├── notebook/
 │   ├── 00_Preprocessing.ipynb
 │   ├── stock_forecasting_comparison.ipynb
@@ -25,36 +27,62 @@ ML/
 outlet (SHOP001–SHOP003) dengan kolom tanggal, jam, nomor struk, item, jumlah,
 harga, metode pembayaran, dan status kartu loyalitas.
 
-Data ini dipakai di tiga tempat:
+Data ini dipakai di empat tempat:
 
 1. **Web** — diimpor ke PostgreSQL oleh `TransactionImportSeeder` saat boot pertama,
    sehingga dashboard punya angka nyata.
-2. **ML** — menjadi dasar semua fitur model setelah notebook preprocessing.
-3. **Verifikasi** — `docker/verify/click_through.py` memakai angka yang berasal
+2. **Web** — `Stock.csv` diimpor oleh `StockImportSeeder` menjadi saldo stok.
+3. **ML** — menjadi dasar semua fitur model setelah notebook preprocessing.
+4. **Verifikasi** — `docker/verify/click_through.py` memakai angka yang berasal
    dari impor ini.
 
-Ekspor aslinya berakhir September 2025. Saat impor, tanggal digeser maju dalam
-kelipatan minggu supaya data berakhir kemarin; pola hari dalam minggu tetap utuh.
+Tanggal tidak digeser saat impor: dashboard menampilkan rentang yang benar-benar
+ada di berkas.
+
+## Data stok
+
+`Stock.csv` adalah ledger harian dengan kolom `Date, Outlet, ItemID,
+OpeningStock, StockIn, StockOut, ClosingStock, MinimumStock`, dan
+`ItemMaster.csv` memetakan `ItemID` ke nama produk.
+
+Berkasnya dibentuk oleh `script/generate_stock_data.py` dari penjualan asli:
+satu baris per outlet x item x hari, jumlah terjual menjadi `StockOut`, dan
+kebijakan pengisian ulang (s, S) menentukan `StockIn` serta `ClosingStock`.
+Artinya **saldo stok adalah hasil simulasi dari transaksi asli**, bukan hasil
+stock opname. Kalau nanti ada pencatatan stok fisik, ganti `Stock.csv` dengan
+ekspor itu — `StockImportSeeder` tidak peduli dari mana berkasnya berasal,
+selama kolom dan aturannya sama.
+
+Aturannya harus konsisten, karena `build_stock_dataset.py` dan
+`StockImportSeeder` sama-sama mengandalkannya:
+
+- grain unik `Date x Outlet x ItemID`, dan setiap seri memuat tanggal lengkap
+  tanpa hari yang hilang (baris tanpa penjualan tetap ada dengan `StockOut = 0`);
+- `OpeningStock + StockIn - StockOut = ClosingStock`, `ClosingStock >= 0`;
+- `OpeningStock` sebuah hari sama dengan `ClosingStock` hari sebelumnya;
+- `ProductName` di `ItemMaster.csv` sama persis dengan string item di
+  `Transactions.csv`.
 
 ## Kenapa ada skrip tambahan
 
-Ekspor kasir tidak memuat jumlah stok. Karena itu saldo harus disusun, dan dua
-skrip di folder `script/` melakukannya:
+Ekspor kasir tidak memuat jumlah stok, jadi dua skrip di folder `script/`
+menyiapkannya:
 
-- **`generate_stock_data.py`** membuat ledger stok harian sintetis dengan kebijakan
-  (s, S): titik pesan ulang dari rata-rata permintaan, jumlah pesan sampai
-  `s + rata-rata × (L+1) + 1,96 × simpangan × akar(L+1)`, dengan lead time per
-  outlet (SHOP001 = 3 hari, SHOP002 dan SHOP003 = 2 hari). Keluarannya `Stock.csv`
-  dan `ItemMaster.csv`.
-- **`build_stock_dataset.py`** memperbaiki dua kelemahan ledger itu: pesanan yang
-  masih dalam perjalanan direkonstruksi menjadi `on_order_qty`, dan titik pesan
-  ulang dihitung ulang dari permintaan terkini (`reorder_point_dyn`) alih-alih
-  kolom `MinimumStock` yang statis. Label bersifat maju: "apakah outlet x item
-  akan habis dalam lead time atau H hari". Keluarannya
-  `stock_forecast_dataset.csv` beserta metadata.
+- **`generate_stock_data.py`** membentuk `Stock.csv` dan `ItemMaster.csv` dari
+  transaksi: kebijakan (s, S) dengan titik pesan ulang
+  `max(1, ceil(rata-rata harian × 3))` dan lead time per outlet (SHOP001 = 3
+  hari, SHOP002 dan SHOP003 = 2 hari). Keluarannya simulasi, bukan pencatatan.
+- **`build_stock_dataset.py`** menyusun dataset pemodelan. Fitur stok dibaca apa
+  adanya (`ClosingStock`, `MinimumStock`, `gap_to_min`, `cover_days`), fitur
+  permintaan adalah `StockOut` yang di-lag, dan fitur trafik outlet berasal dari
+  transaksi. Tidak ada lead time, pesanan dalam perjalanan, atau reorder point
+  yang direkonstruksi. Label bersifat maju: "apakah outlet x item akan habis
+  dalam H hari", dengan `H` 2, 3, dan 7.
 
-Label risiko kehabisan stok adalah proxy berbasis kecepatan penjualan, bukan hasil
-pencatatan stok nyata. API menyebutkan hal ini lewat field `proxy_label`.
+Dataset itu tidak membuat label risiko kehabisan stok dari kecepatan penjualan
+sebagai pengganti pencatatan stok: labelnya memakai `ClosingStock` yang tercatat.
+`demand_true`, `is_censored` dan `lost_units` tetap ada untuk mengukur berapa
+permintaan yang tidak terlayani ledger.
 
 ## Alur ke aplikasi
 
@@ -63,11 +91,21 @@ ML/data/Transactions.csv
       │
       ├──> impor ke PostgreSQL ──────────> dashboard web
       │
-      └──> notebook + script ──> artefak ──> API FastAPI ──> Laravel ──> mobile
+      └──> notebook ──> artefak ──> API FastAPI ──> Laravel ──> mobile
+
+ML/data/Stock.csv + ItemMaster.csv
+      │
+      ├──> impor ke PostgreSQL ──────────> halaman stok + dashboard
+      │
+      └──> build_stock_dataset.py ──> dataset latih ──> artefak
 ```
 
 ## Kondisi saat ini
 
+- `Stock.csv` dan `ItemMaster.csv` sudah ada di repo, dibentuk oleh
+  `generate_stock_data.py`. Isinya simulasi ledger dari penjualan asli, jadi
+  saldo stok di dashboard adalah keadaan simulasi pada tanggal terakhir berkas
+  (2025-09-30), bukan stok fisik hari ini.
 - `ML/artifacts/` **tidak ada** di repo, dan folder pelatihan juga tidak ada.
   Akibatnya FastAPI melaporkan kelima model `unavailable` dan endpoint prediksi
   menjawab `503`; bagian lain aplikasi tetap berjalan.
@@ -81,8 +119,7 @@ artefak ada, `docker compose --profile api up -d` akan memuatnya otomatis.
 ## Menjalankan skrip
 
 ```bash
-python3 ML/script/generate_stock_data.py    # butuh ML/data/Transactions.csv
-python3 ML/script/build_stock_dataset.py    # butuh Stock.csv dan ItemMaster.csv
+python3 ML/script/build_stock_dataset.py    # butuh Stock.csv, ItemMaster.csv
 ```
 
 Keduanya menulis ke `ML/data/`, tidak menyentuh data asli.

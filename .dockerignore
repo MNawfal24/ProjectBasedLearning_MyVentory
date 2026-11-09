@@ -18,6 +18,8 @@ API/Dockerfile
 # because the web image seeds its database from them.
 ML/data/*
 !ML/data/Transactions.csv
+!ML/data/Stock.csv
+!ML/data/ItemMaster.csv
 ML/train
 ML/README.md
 

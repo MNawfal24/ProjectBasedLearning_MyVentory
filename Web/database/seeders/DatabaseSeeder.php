@@ -11,6 +11,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(TransactionImportSeeder::class);
+        $this->call(StockImportSeeder::class);
 
         User::query()->updateOrCreate(
             ['email' => env('MYVENTORY_ADMIN_EMAIL', 'admin@myventory.com')],

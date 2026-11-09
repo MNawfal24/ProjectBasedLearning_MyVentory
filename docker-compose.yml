@@ -1,4 +1,4 @@
-name: myventory
+﻿name: myventory
 
 services:
   db:
@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-myventory}
     volumes:
       - db-data:/var/lib/postgresql/data
-      - ./docker/db/init-test-database.sql:/docker-entrypoint-initdb.d/10-test-database.sql:ro
+      - ./Docker/db/init-test-database.sql:/docker-entrypoint-initdb.d/10-test-database.sql:ro
     ports:
       - "${DB_PORT_FORWARD:-5432}:5432"
     healthcheck:
@@ -25,7 +25,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: docker/web/Dockerfile
+      dockerfile: Docker/web/Dockerfile
       # Without an explicit target Docker builds the last stage, which is the test image.
       target: runtime
     depends_on:
@@ -50,6 +50,8 @@ services:
       LOG_LEVEL: warning
       MYVENTORY_SEED: ${MYVENTORY_SEED:-true}
       MYVENTORY_SEED_CSV: database/data/Transactions.csv
+      MYVENTORY_STOCK_CSV: database/data/Stock.csv
+      MYVENTORY_ITEM_MASTER_CSV: database/data/ItemMaster.csv
       # Internal ML service. Start it with `docker compose --profile api up -d`;
       # prediction routes answer 503 while it is down.
       ML_API_URL: http://api:8000/api/v1
@@ -66,7 +68,7 @@ services:
     profiles: ["test"]
     build:
       context: .
-      dockerfile: docker/web/Dockerfile
+      dockerfile: Docker/web/Dockerfile
       target: testing
     depends_on:
       db:
@@ -100,3 +102,4 @@ services:
 volumes:
   db-data:
   web-storage:
+

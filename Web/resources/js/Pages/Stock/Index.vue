@@ -3,16 +3,18 @@ import { Head, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { Badge } from '@/Components/ui/badge';
 import { Button } from '@/Components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table';
 import AppLayout from '../../Layouts/AppLayout.vue';
 import Icon from '../../Components/Icon.vue';
 import Modal from '../../Components/Modal.vue';
+import MultiBarChart from '../../Components/MultiBarChart.vue';
 import Pagination from '../../Components/Pagination.vue';
-import { formatDateTime, formatNumber } from '../../format';
-import { visitWith } from '../../ui';
+import Panel from '../../Components/Panel.vue';
+import { formatDate, formatDateTime, formatNumber } from '../../format';
+import { useChartColors, visitWith } from '../../ui';
 
 const props = defineProps({
     stocks: { type: Object, required: true },
@@ -21,6 +23,8 @@ const props = defineProps({
     outlets: { type: Array, required: true },
     products: { type: Array, required: true },
     summary: { type: Object, required: true },
+    chart: { type: Object, required: true },
+    as_of: { type: String, default: null },
 });
 
 const showMovement = ref(false);
@@ -92,11 +96,36 @@ const statuses = [
 ];
 
 const summaryCards = computed(() => [
-    { label: 'Seri stok', value: props.summary.series, class: 'text-ink' },
+    { label: 'Outlet × produk', value: props.summary.series, class: 'text-ink' },
     { label: 'Menipis', value: props.summary.low, class: 'text-accent' },
     { label: 'Habis', value: props.summary.out, class: 'text-danger' },
     { label: 'Unit di gudang', value: props.summary.units, class: 'text-ink' },
 ]);
+
+const colors = useChartColors();
+
+const buckets = [
+    { key: 'safe', label: 'Aman' },
+    { key: 'low', label: 'Menipis' },
+    { key: 'out', label: 'Habis' },
+];
+
+const palette = computed(() => [colors.value.primary, colors.value.accent, colors.value.danger]);
+
+const statusChart = computed(() => ({
+    categories: props.chart.status.map((row) => row.outlet),
+    series: buckets.map((bucket, index) => ({
+        name: bucket.label,
+        color: palette.value[index],
+        data: props.chart.status.map((row) => row[bucket.key]),
+    })),
+}));
+
+const balanceHint = computed(() =>
+    props.as_of
+        ? `Saldo per ${formatDate(props.as_of)}, dijumlah dari pergerakan stok yang tercatat.`
+        : 'Belum ada pergerakan stok yang tercatat.',
+);
 </script>
 
 <template>
@@ -125,38 +154,30 @@ const summaryCards = computed(() => [
             </Card>
         </div>
 
+        <div class="mt-4">
+            <Panel title="Komposisi status stok per outlet" :hint="balanceHint">
+                <div class="mb-3 flex flex-wrap items-center gap-4 text-xs text-muted">
+                    <span v-for="(bucket, index) in buckets" :key="bucket.key" class="flex items-center gap-2">
+                        <span class="h-2.5 w-2.5 rounded-sm" :style="{ backgroundColor: palette[index] }"></span>
+                        {{ bucket.label }} · {{ formatNumber(summary[bucket.key]) }}
+                    </span>
+                </div>
+                <MultiBarChart
+                    :categories="statusChart.categories"
+                    :series="statusChart.series"
+                    stack
+                    horizontal
+                    :height="150"
+                    suffix=" seri"
+                />
+            </Panel>
+        </div>
+
         <Card class="mt-4">
-            <CardContent class="flex flex-wrap items-end gap-3 border-b border-line">
-                <div>
-                    <Label for="stock-outlet" class="mb-1">Outlet</Label>
-                    <select
-                        id="stock-outlet"
-                        class="field w-auto"
-                        :value="filters.outlet ?? ''"
-                        @change="visitWith({ outlet: $event.target.value || null, page: null })"
-                    >
-                        <option value="">Semua</option>
-                        <option v-for="outlet in outlets" :key="outlet.id" :value="outlet.id">{{ outlet.code }}</option>
-                    </select>
-                </div>
-
-                <div class="flex items-center gap-1" role="group" aria-label="Status stok">
-                    <Button
-                        v-for="status in statuses"
-                        :key="status.value"
-                        :variant="filters.status === status.value ? 'secondary' : 'ghost'"
-                        size="sm"
-                        :aria-pressed="filters.status === status.value"
-                        @click="visitWith({ status: status.value || null, page: null })"
-                    >
-                        {{ status.label }}
-                    </Button>
-                </div>
-
-                <p class="ml-auto max-w-md text-xs text-muted">
-                    Saldo awal berasal dari kecepatan penjualan 14 hari terakhir, karena ekspor kasir tidak memuat jumlah stok.
-                </p>
-            </CardContent>
+            <CardHeader class="border-b border-line py-4">
+                <CardTitle>Saldo stok</CardTitle>
+                <CardDescription>Satu baris per outlet dan produk. Filter ada di judul kolom.</CardDescription>
+            </CardHeader>
 
             <template v-if="stocks.data.length">
                 <Table>
@@ -164,10 +185,41 @@ const summaryCards = computed(() => [
                         <TableRow class="hover:bg-transparent">
                             <TableHead>Produk</TableHead>
                             <TableHead>SKU</TableHead>
-                            <TableHead>Outlet</TableHead>
+                            <TableHead>
+                                <div class="flex items-center gap-2">
+                                    <span>Outlet</span>
+                                    <select
+                                        id="stock-outlet"
+                                        class="field h-7 w-auto px-2 py-0 text-xs"
+                                        aria-label="Filter outlet"
+                                        :value="filters.outlet ?? ''"
+                                        @change="visitWith({ outlet: $event.target.value || null, page: null })"
+                                    >
+                                        <option value="">Semua</option>
+                                        <option v-for="outlet in outlets" :key="outlet.id" :value="outlet.id">
+                                            {{ outlet.code }}
+                                        </option>
+                                    </select>
+                                </div>
+                            </TableHead>
                             <TableHead class="text-right">Saldo</TableHead>
                             <TableHead class="text-right">Minimum</TableHead>
-                            <TableHead>Status</TableHead>
+                            <TableHead>
+                                <div class="flex items-center gap-2">
+                                    <span>Status</span>
+                                    <select
+                                        id="stock-status"
+                                        class="field h-7 w-auto px-2 py-0 text-xs"
+                                        aria-label="Filter status"
+                                        :value="filters.status ?? ''"
+                                        @change="visitWith({ status: $event.target.value || null, page: null })"
+                                    >
+                                        <option v-for="status in statuses" :key="status.value" :value="status.value">
+                                            {{ status.label }}
+                                        </option>
+                                    </select>
+                                </div>
+                            </TableHead>
                             <TableHead class="text-right">Aksi</TableHead>
                         </TableRow>
                     </TableHeader>

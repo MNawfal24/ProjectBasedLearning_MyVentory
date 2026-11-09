@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\Stock;
+use App\Models\StockMovement;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
 use Carbon\CarbonImmutable;
@@ -22,8 +23,14 @@ class DashboardStats
     public function build(int $days = 30, ?int $outletId = null): array
     {
         $days = in_array($days, self::PERIODS, true) ? $days : 30;
-        $to = Transaction::query()->max('business_date');
-        $to = $to ? CarbonImmutable::parse($to) : CarbonImmutable::today();
+        // The period ends at the newest receipt of the selected scope, so adding an
+        // older outlet does not silently move the window of a newer one.
+        $scope = Transaction::query()
+            ->when($outletId, fn (Builder $query) => $query->where('outlet_id', $outletId))
+            ->selectRaw('MIN(business_date) as first_day, MAX(business_date) as last_day')
+            ->first();
+
+        $to = $scope?->last_day ? CarbonImmutable::parse($scope->last_day) : CarbonImmutable::today();
         $from = $to->subDays($days - 1);
 
         $current = $this->scope($from, $to, $outletId);
@@ -41,6 +48,12 @@ class DashboardStats
                 'previous_from' => $previousFrom->toDateString(),
                 'previous_to' => $previousTo->toDateString(),
             ],
+            // The span the dataset actually covers, so a period that reaches past it
+            // is visible instead of looking like missing sales.
+            'data_range' => [
+                'from' => $scope?->first_day,
+                'to' => $scope?->last_day,
+            ],
             'kpis' => $this->kpis($current, $previous),
             // The newest day that actually carries receipts, so the panel is never a
             // structural zero when the export stops a few days short of today.
@@ -57,8 +70,24 @@ class DashboardStats
                 'units_on_hand' => (float) Stock::query()
                     ->when($outletId, fn (Builder $query) => $query->where('outlet_id', $outletId))
                     ->sum('quantity'),
+                // Balances follow the last imported stock movement, not today.
+                'as_of' => $this->stockAsOf($outletId),
             ],
         ];
+    }
+
+    /**
+     * Date of the newest recorded stock movement for the scope, or null when no
+     * stock has ever been recorded. The stock pages state it so a balance is
+     * understood as of that date.
+     */
+    public function stockAsOf(?int $outletId = null): ?string
+    {
+        $latest = StockMovement::query()
+            ->when($outletId, fn (Builder $query) => $query->where('outlet_id', $outletId))
+            ->max('occurred_at');
+
+        return $latest ? CarbonImmutable::parse($latest)->toDateString() : null;
     }
 
     private function lastSale(?int $outletId): array
@@ -168,13 +197,17 @@ class DashboardStats
         return $series;
     }
 
+    /**
+     * Every hour of the day, so a quiet hour is a visible zero rather than a gap
+     * in the chart.
+     */
     private function byHour(Builder $query): array
     {
         $rows = (clone $query)
             ->selectRaw('hour, COUNT(*) as transactions, COALESCE(SUM(net_sales), 0) as revenue')
             ->groupBy('hour')
             ->get()
-            ->keyBy('hour');
+            ->keyBy(fn ($row) => (int) $row->hour);
 
         return collect(range(0, 23))->map(function (int $hour) use ($rows) {
             $row = $rows->get($hour);

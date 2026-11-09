@@ -147,4 +147,38 @@ class StockFlowTest extends TestCase
 
         $this->assertSame(0, Stock::query()->count());
     }
+
+    public function test_stock_charts_and_summary_follow_the_outlet_filter(): void
+    {
+        $first = $this->outlet();
+        $second = Outlet::create(['code' => 'SHOP002', 'name' => 'SHOP002']);
+        $product = $this->product();
+
+        $ledger = app(StockLedger::class);
+        $ledger->record($first, $product, 'in', 10);
+        $ledger->record($second, $product, 'in', 2);
+        $ledger->setMinimum($second, $product, 5);
+
+        $this->get('/stock')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Stock/Index')
+                ->where('summary.series', 2)
+                ->where('summary.safe', 1)
+                ->where('summary.low', 1)
+                ->where('chart.status.0.outlet', 'SHOP001')
+                ->where('chart.status.0.safe', 1)
+                ->where('chart.status.1.outlet', 'SHOP002')
+                ->where('chart.status.1.low', 1)
+                ->missing('chart.units')
+                ->missing('chart.products'));
+
+        $this->get("/stock?outlet={$second->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('summary.series', 1)
+                ->where('summary.low', 1)
+                ->has('chart.status', 1)
+                ->where('chart.status.0.outlet', 'SHOP002'));
+    }
 }

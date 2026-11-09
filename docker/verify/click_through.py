@@ -107,13 +107,17 @@ def run() -> None:
         page.screenshot(path=OUT / "stock-desktop.png", full_page=True)
         record("Stock nav", "click", f"h1={page.locator('h1').first.inner_text()}")
 
-        with page.expect_response(lambda r: "status=low" in r.url and r.status == 200):
-            page.get_by_role("button", name="Menipis", exact=True).click()
-        page.wait_for_timeout(400)
-        record("Stock filter", "Menipis", f"rows={page.locator('tbody tr').count()}")
-        with page.expect_response(lambda r: "status=" not in r.url and "/stock" in r.url and r.status == 200):
-            page.get_by_role("button", name="Semua", exact=True).click()
-        page.wait_for_timeout(400)
+        page.select_option("#stock-outlet", label="SHOP002")
+        page.wait_for_timeout(600)
+        record("Stock filter", "outlet SHOP002", f"rows={page.locator('tbody tr').count()}")
+        page.select_option("#stock-outlet", label="Semua")
+        page.wait_for_timeout(600)
+
+        page.select_option("#stock-status", label="Menipis")
+        page.wait_for_timeout(600)
+        record("Stock filter", "status Menipis", f"rows={page.locator('tbody tr').count()}")
+        page.select_option("#stock-status", label="Semua")
+        page.wait_for_timeout(600)
 
         page.get_by_role("button", name="Catat pergerakan").click()
         page.wait_for_selector("[role='dialog']")
