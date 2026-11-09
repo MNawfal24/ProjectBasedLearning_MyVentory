@@ -39,18 +39,6 @@ Dashboard web (admin)      ──session───────┘              �
 
 Semua angka dihitung dari tabel, tidak ada nilai contoh di layar.
 
-## Lima folder
-
-| Folder | Peran |
-|---|---|
-| [`Web/`](Docs/web.md) | Backend Laravel + dashboard Vue. Sumber kebenaran data dan aturan akses. |
-| [`API/`](Docs/api.md) | Layanan FastAPI untuk lima model ML. Tanpa database dan autentikasi, hanya dipanggil Laravel. |
-| [`ML/`](Docs/ml.md) | Data transaksi, notebook, dan skrip pembentukan dataset. |
-| [`Mobile/`](Docs/mobile.md) | Aplikasi Flutter untuk staf. Tampilan saja. |
-| [`docker/`](Docs/docker.md) | Dockerfile, entrypoint, konfigurasi Apache, dan skrip verifikasi. |
-
-Dokumentasi lengkap tiap bagian: [`Docs/README.md`](Docs/README.md).
-
 ## Mencoba
 
 Butuh Docker dan Docker Compose.
@@ -82,7 +70,7 @@ Dibuat sebagai proyek *Project Based Learning* Semester 5, Politeknik Negeri Mal
 Terima kasih kepada para kontributor:
 
 | Kontributor | GitHub |
-|---|---|---|
+|---|---|
 | Vanesa Mardiana Putri | [@vanesamrd](https://github.com/vanesamrd) |
 | M. Nawfal Mawla Azhar | [@MNawfal24](https://github.com/MNawfal24) |
 | Arya Bayu Samodra | [@bavucadoz](https://github.com/bavucadoz) |
