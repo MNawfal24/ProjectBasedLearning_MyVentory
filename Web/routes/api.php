@@ -9,7 +9,7 @@ use App\Http\Controllers\Api\TransactionController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1')->group(function () {
+Route::prefix('v1')->name('api.')->group(function () {
     Route::get('health', function () {
         DB::connection()->select('select 1');
 
