@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../data/mock_data.dart';
-import '../../widgets/app_theme.dart';
-import '../../widgets/stat_card.dart';
+import 'package:myventory/data/mock_data.dart';
+import 'package:myventory/widgets/app_theme.dart';
+import 'package:myventory/widgets/stat_card.dart';
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   final InventoryStore store;
   final VoidCallback onOpenProducts;
 
@@ -14,8 +14,140 @@ class DashboardPage extends StatelessWidget {
     required this.onOpenProducts,
   });
 
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  Map<String, dynamic>? _summary;
+  bool _loadingSummary = false;
+
   String currency(double value) {
     return 'Rp ${value.toStringAsFixed(0)}';
+  }
+
+  double _todaySales() {
+    if (_summary == null) return 0.0;
+    final kpis = _summary!['kpis'];
+    if (kpis == null) return 0.0;
+    final revenue = kpis['revenue'];
+    if (revenue == null) return 0.0;
+    return (revenue is Map) ? (revenue['value'] ?? 0.0) : 0.0;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadSummary();
+      }
+    });
+  }
+
+  Future<void> _loadSummary() async {
+    setState(() {
+      _loadingSummary = true;
+    });
+    try {
+      final summary = await widget.store.fetchDashboardSummary(days: 30);
+      if (mounted) setState(() => _summary = summary);
+    } catch (_) {
+      // ignore
+    } finally {
+      if (mounted) setState(() => _loadingSummary = false);
+    }
+  }
+
+  List<Widget> _buildLowStockWidgets() {
+    if (widget.store.lowStockProducts.isEmpty) {
+      return [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(
+            'All products have sufficient stock.',
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontFamily:
+                  Theme.of(context).textTheme.bodyMedium?.fontFamily ?? 'Poppins',
+            ),
+          ),
+        ),
+      ];
+    }
+    return widget.store.lowStockProducts.take(3).map((product) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: AppTheme.primary.withValues(alpha: 0.08),
+              child: const Icon(
+                Icons.warning_amber_rounded,
+                color: AppTheme.warning,
+                size: 21,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                      fontFamily:
+                          Theme.of(context).textTheme.bodyMedium?.fontFamily ??
+                          'Poppins',
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Stock ${product.stock} ${product.unit} • Min ${product.minStock}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                      fontFamily:
+                          Theme.of(context).textTheme.bodyMedium?.fontFamily ??
+                          'Poppins',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.chevron_right,
+              color: AppTheme.textSecondary,
+            ),
+          ],
+        ),
+      );
+    }).toList();
   }
 
   @override
@@ -23,8 +155,43 @@ class DashboardPage extends StatelessWidget {
     final textFamily =
         Theme.of(context).textTheme.bodyMedium?.fontFamily ?? 'Poppins';
 
+    final headerChildren = <Widget>[
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Halo, Pengguna',
+              style: TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                fontFamily: textFamily,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              'Selamat mengelola inventaris Anda',
+              style: TextStyle(
+                color: AppTheme.textSecondary,
+                fontFamily: textFamily,
+              ),
+            ),
+          ],
+        ),
+      ),
+      ...[_loadingSummary ? const Padding(
+            padding: EdgeInsets.only(left: 12),
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ) : const SizedBox.shrink()],
+    ];
+
     return AnimatedBuilder(
-      animation: store,
+      animation: widget.store,
       builder: (context, _) {
         return Container(
           decoration: const BoxDecoration(
@@ -36,9 +203,7 @@ class DashboardPage extends StatelessWidget {
           ),
           child: SafeArea(
             child: RefreshIndicator(
-              onRefresh: () async {
-                await Future.delayed(const Duration(milliseconds: 500));
-              },
+              onRefresh: _loadSummary,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 110),
@@ -46,52 +211,7 @@ class DashboardPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Halo, Nopal',
-                                style: TextStyle(
-                                  color: AppTheme.textPrimary,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w700,
-                                  fontFamily: textFamily,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Inventory summary',
-                                style: TextStyle(
-                                  color: AppTheme.textSecondary,
-                                  fontSize: 13,
-                                  fontFamily: textFamily,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.primary.withValues(alpha: 0.10),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            Icons.notifications_none_rounded,
-                            color: AppTheme.primary,
-                          ),
-                        ),
-                      ],
+                      children: headerChildren,
                     ),
                     const SizedBox(height: 18),
                     Container(
@@ -144,7 +264,7 @@ class DashboardPage extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Rp 0',
+                                  currency(_todaySales()),
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 24,
@@ -165,7 +285,7 @@ class DashboardPage extends StatelessWidget {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              '+12.4%',
+                              _summary == null ? '--' : '+0.0%',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,
@@ -187,28 +307,28 @@ class DashboardPage extends StatelessWidget {
                       children: [
                         StatCard(
                           title: 'Products',
-                          value: '${store.totalProducts}',
+                          value: '${widget.store.totalProducts}',
                           subtitle: 'Total products',
                           icon: Icons.inventory_2_outlined,
                           color: AppTheme.primary,
                         ),
                         StatCard(
                           title: 'Low Stock',
-                          value: '${store.totalLowStock}',
+                          value: '${widget.store.totalLowStock}',
                           subtitle: 'Need attention',
                           icon: Icons.warning_amber_rounded,
                           color: AppTheme.warning,
                         ),
                         StatCard(
                           title: 'Stock',
-                          value: '${store.totalStock}',
+                          value: '${widget.store.totalStock}',
                           subtitle: 'Total quantity',
                           icon: Icons.layers_outlined,
                           color: AppTheme.secondary,
                         ),
                         StatCard(
                           title: 'Sales',
-                          value: 'Rp 0',
+                          value: currency(_todaySales()),
                           subtitle: 'Today',
                           icon: Icons.payments_outlined,
                           color: AppTheme.primary,
@@ -229,7 +349,7 @@ class DashboardPage extends StatelessWidget {
                           ),
                         ),
                         TextButton(
-                          onPressed: onOpenProducts,
+                          onPressed: widget.onOpenProducts,
                           child: Text(
                             'View all',
                             style: TextStyle(
@@ -242,92 +362,7 @@ class DashboardPage extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    if (store.lowStockProducts.isEmpty)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          'All products have sufficient stock.',
-                          style: TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontFamily: textFamily,
-                          ),
-                        ),
-                      )
-                    else
-                      ...store.lowStockProducts.take(3).map((product) {
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 15,
-                            vertical: 13,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.02),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 20,
-                                backgroundColor: AppTheme.primary.withValues(
-                                  alpha: 0.08,
-                                ),
-                                child: Icon(
-                                  Icons.warning_amber_rounded,
-                                  color: AppTheme.warning,
-                                  size: 21,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      product.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.textPrimary,
-                                        fontFamily: textFamily,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      'Stock ${product.stock} ${product.unit} • Min ${product.minStock}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppTheme.textSecondary,
-                                        fontFamily: textFamily,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Icon(
-                                Icons.chevron_right,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
+                    ..._buildLowStockWidgets(),
                   ],
                 ),
               ),

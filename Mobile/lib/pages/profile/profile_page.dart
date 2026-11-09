@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 
-import '../../data/mock_data.dart';
-import '../../widgets/app_theme.dart';
+import 'package:myventory/core/controllers/auth_controller.dart';
+import 'package:myventory/data/mock_data.dart';
+import 'package:myventory/widgets/app_theme.dart';
 
 class ProfilePage extends StatelessWidget {
   final InventoryStore store;
-  final VoidCallback onLogout;
+  final AuthController auth;
+  final Future<void> Function()? onLogout;
 
   const ProfilePage({
     super.key,
     required this.store,
+    required this.auth,
     required this.onLogout,
   });
 
@@ -73,7 +76,7 @@ class ProfilePage extends StatelessWidget {
                     ),
                     const SizedBox(height: 15),
                     Text(
-                      'Kopi Senja Cafe',
+                      auth.user?['name'] ?? 'Pengguna',
                       style: TextStyle(
                         fontSize: 21,
                         fontWeight: FontWeight.bold,
@@ -83,7 +86,7 @@ class ProfilePage extends StatelessWidget {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      'Cafe & Coffee Shop',
+                      auth.user?['email'] ?? '-',
                       style: TextStyle(
                         color: AppTheme.textSecondary,
                         fontFamily: textFamily,
@@ -141,11 +144,13 @@ class ProfilePage extends StatelessWidget {
                   );
                 },
               ),
+              const Divider(height: 1),
               _MenuItem(
                 icon: Icons.logout,
                 title: 'Logout',
                 subtitle: 'Sign out of your account',
                 onTap: () => _confirmLogout(context),
+                textColor: AppTheme.danger,
               ),
             ],
           ),
@@ -165,16 +170,22 @@ class ProfilePage extends StatelessWidget {
             onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.danger,
+            ),
             child: const Text('Logout'),
           ),
         ],
       ),
     );
 
-    if (shouldLogout == true) {
-      onLogout();
+    if (shouldLogout == true && context.mounted) {
+      final logoutFn = onLogout;
+      if (logoutFn != null) {
+        await logoutFn();
+      }
     }
   }
 
@@ -204,12 +215,14 @@ class _MenuItem extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final Color? textColor;
 
   const _MenuItem({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.textColor,
   });
 
   @override
@@ -227,19 +240,19 @@ class _MenuItem extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: primary.withValues(alpha: 0.08),
+            color: (textColor ?? primary).withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
             icon,
-            color: primary,
+            color: textColor ?? primary,
           ),
         ),
         title: Text(
           title,
           style: TextStyle(
             fontWeight: FontWeight.w700,
-            color: AppTheme.textPrimary,
+            color: textColor ?? AppTheme.textPrimary,
             fontFamily: textFamily,
           ),
         ),

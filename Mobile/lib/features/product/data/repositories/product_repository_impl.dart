@@ -1,50 +1,100 @@
-import '../../domain/entities/product.dart';
-import '../../domain/repositories/product_repository.dart';
-import '../datasources/product_local_datasource.dart';
-import '../models/product_model.dart';
+import 'package:myventory/features/product/data/product_remote_datasource.dart';
+import 'package:myventory/features/product/domain/entities/product.dart';
+import 'package:myventory/features/product/domain/repositories/product_repository.dart';
 
+/// Implementasi repositori produk yang didukung oleh API Laravel (Sanctum).
 class ProductRepositoryImpl implements ProductRepository {
-  final ProductLocalDataSource localDataSource;
+  final ProductRemoteDataSource _remote;
 
-  ProductRepositoryImpl(this.localDataSource);
+  ProductRepositoryImpl(this._remote);
+
+  final List<Product> _products = [];
 
   @override
-  List<Product> getProducts() {
-    return localDataSource.getProducts();
+  List<Product> get products => List.unmodifiable(_products);
+
+  @override
+  List<Product> getLowStockProducts() =>
+      _products.where((product) => product.isLowStock).toList();
+
+  @override
+  int getTotalProducts() => _products.length;
+
+  @override
+  int getTotalLowStock() => getLowStockProducts().length;
+
+  @override
+  int getTotalStock() =>
+      _products.fold(0, (sum, product) => sum + product.stock);
+
+  @override
+  Future<void> loadProducts({String? outletId}) async {
+    _products
+      ..clear()
+      ..addAll(await _remote.getProducts(outletId: outletId));
   }
 
   @override
-  Product getProductById(String id) {
-    return localDataSource.getProductById(id);
+  Future<Product> getProductById(String id, {String? outletId}) async {
+    final cached = _products.firstWhereOrNull((p) => p.id == id);
+    if (cached != null) return cached;
+    return await _remote.getProductById(id, outletId: outletId);
   }
 
   @override
-  void addProduct(Product product) {
-    localDataSource.addProduct(ProductModel.fromEntity(product));
+  Future<Product> addProduct(Product product) async {
+    final created = await _remote.addProduct(product);
+    _products.add(created);
+    return created;
   }
 
   @override
-  void updateProduct(Product product) {
-    localDataSource.updateProduct(ProductModel.fromEntity(product));
+  Future<Product> updateProduct(Product product) async {
+    final updated = await _remote.updateProduct(product);
+    final index = _products.indexWhere((p) => p.id == product.id);
+    if (index != -1) {
+      _products[index] = updated;
+    } else {
+      _products.add(updated);
+    }
+    return updated;
   }
 
   @override
-  List<Product> getLowStockProducts() {
-    return getProducts().where((product) => product.isLowStock).toList();
+  Future<void> deleteProduct(String id) async {
+    await _remote.deleteProduct(id);
+    _products.removeWhere((p) => p.id == id);
   }
 
   @override
-  int getTotalProducts() {
-    return getProducts().length;
+  Future<void> adjustStock({
+    required String outletId,
+    required String productId,
+    required String type,
+    required double quantity,
+    String? note,
+  }) async {
+    await _remote.recordStockMovement(
+      outletId: outletId,
+      productId: productId,
+      type: type,
+      quantity: quantity,
+      note: note,
+    );
+    await loadProducts(outletId: outletId);
   }
 
   @override
-  int getTotalLowStock() {
-    return getLowStockProducts().length;
+  Future<void> setMinStock(String stockId, double minQuantity) async {
+    await _remote.setMinStock(stockId, minQuantity);
   }
+}
 
-  @override
-  int getTotalStock() {
-    return getProducts().fold(0, (sum, product) => sum + product.stock);
+extension _FirstWhereOrNull<E> on Iterable<E> {
+  E? firstWhereOrNull(bool Function(E) test) {
+    for (final element in this) {
+      if (test(element)) return element;
+    }
+    return null;
   }
 }

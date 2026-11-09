@@ -14,6 +14,10 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Masuk'), findsOneWidget);
     expect(find.text('Dashboard'), findsNothing);
 
+    // Buka halaman Login dari LandingPage
+    await tester.tap(find.widgetWithText(FilledButton, 'Masuk'));
+    await tester.pumpAndSettle();
+
     await tester.enterText(
       find.byType(TextFormField).at(0),
       'admin@myventory.com',

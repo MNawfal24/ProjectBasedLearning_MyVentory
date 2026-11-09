@@ -1,0 +1,17 @@
+# Secrets
+.env
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+*.iml
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+

@@ -7,6 +7,10 @@ class Product {
   final String unit;
   final double buyPrice;
   final double sellPrice;
+  final String? sku;
+  final bool isActive;
+  final String? stockId;
+  final String? outletId;
 
   Product({
     required this.id,
@@ -17,6 +21,10 @@ class Product {
     required this.unit,
     required this.buyPrice,
     required this.sellPrice,
+    this.sku,
+    this.isActive = false,
+    this.stockId,
+    this.outletId,
   });
 
   bool get isLowStock => stock <= minStock;
@@ -30,6 +38,10 @@ class Product {
     String? unit,
     double? buyPrice,
     double? sellPrice,
+    String? sku,
+    bool? isActive,
+    String? stockId,
+    String? outletId,
   }) {
     return Product(
       id: id ?? this.id,
@@ -40,6 +52,23 @@ class Product {
       unit: unit ?? this.unit,
       buyPrice: buyPrice ?? this.buyPrice,
       sellPrice: sellPrice ?? this.sellPrice,
+      sku: sku ?? this.sku,
+      isActive: isActive ?? this.isActive,
+      stockId: stockId ?? this.stockId,
+      outletId: outletId ?? this.outletId,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'category': category,
+        'unit': unit,
+        'sell_price': sellPrice,
+        'buy_price': buyPrice,
+        'is_active': isActive,
+        'sku': sku,
+        'stock_id': stockId,
+        'outlet_id': outletId,
+      };
 }

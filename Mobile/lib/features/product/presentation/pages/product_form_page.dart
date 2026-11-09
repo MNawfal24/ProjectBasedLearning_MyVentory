@@ -6,7 +6,7 @@ import '../../../../widgets/app_theme.dart';
 class ProductFormPage extends StatefulWidget {
   final List<Product>? products;
   final Product? product;
-  final Function(Product)? onSave;
+  final Future<void> Function(Product)? onSave;
 
   const ProductFormPage({
     super.key,
@@ -67,7 +67,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
     super.dispose();
   }
 
-  void saveProduct() {
+  Future<void> saveProduct() async {
     if (!formKey.currentState!.validate()) {
       return;
     }
@@ -76,26 +76,24 @@ class _ProductFormPageState extends State<ProductFormPage> {
       id: widget.product?.id ?? 'P${DateTime.now().millisecondsSinceEpoch}',
       name: nameController.text.trim(),
       category: category,
-      stock: int.parse(stockController.text.trim()),
-      minStock: int.parse(minStockController.text.trim()),
+      stock: int.tryParse(stockController.text.trim()) ?? (widget.product?.stock ?? 0),
+      minStock: int.tryParse(minStockController.text.trim()) ?? (widget.product?.minStock ?? 0),
       unit: unit,
-      buyPrice: double.parse(buyPriceController.text.trim()),
-      sellPrice: double.parse(sellPriceController.text.trim()),
+      buyPrice: double.tryParse(buyPriceController.text.trim()) ?? 0.0,
+      sellPrice: double.tryParse(sellPriceController.text.trim()) ?? 0.0,
+      sku: widget.product?.sku,
+      isActive: widget.product?.isActive ?? true,
+      outletId: widget.product?.outletId,
+      stockId: widget.product?.stockId,
     );
 
     if (widget.onSave != null) {
-      widget.onSave!(product);
+      await widget.onSave!(product);
     }
 
-    Navigator.pop(context);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isEdit ? 'Product updated successfully' : 'Product added successfully',
-        ),
-      ),
-    );
+    if (mounted) {
+      Navigator.pop(context, true);
+    }
   }
 
   String? requiredValidator(String? value) {
@@ -181,12 +179,16 @@ class _ProductFormPageState extends State<ProductFormPage> {
                       controller: stockController,
                       validator: requiredValidator,
                       keyboardType: TextInputType.number,
+                      readOnly: isEdit,
+                      enabled: !isEdit,
                       style: TextStyle(fontFamily: textFamily),
                       decoration: InputDecoration(
                         labelText: 'Current Stock',
                         labelStyle: TextStyle(fontFamily: textFamily, color: AppTheme.textSecondary),
+                        helperText: isEdit ? 'Gunakan Stok Masuk/Keluar di detail' : null,
+                        helperMaxLines: 2,
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: isEdit ? const Color(0xFFF0F2F5) : Colors.white,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
                           borderSide: BorderSide.none,

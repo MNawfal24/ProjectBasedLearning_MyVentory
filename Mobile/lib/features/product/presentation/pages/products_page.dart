@@ -179,7 +179,7 @@ class _ProductsPageState extends State<ProductsPage> {
                             )
                           : ListView.separated(
                               itemCount: filteredProducts.length,
-                              separatorBuilder: (_, _) => const SizedBox(height: 10),
+                              separatorBuilder: (_, __) => const SizedBox(height: 10),
                               itemBuilder: (context, index) {
                                 final product = filteredProducts[index];
 
