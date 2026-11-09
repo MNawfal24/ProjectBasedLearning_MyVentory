@@ -58,7 +58,12 @@ class _AuthGateState extends State<AuthGate> {
           );
         }
 
-        return AppShell(store: _store);
+        return AppShell(
+          store: _store,
+          onLogout: () async {
+            await authController.logout();
+          },
+        );
       },
     );
   }
@@ -66,10 +71,12 @@ class _AuthGateState extends State<AuthGate> {
 
 class AppShell extends StatefulWidget {
   final InventoryStore store;
+  final Future<void> Function()? onLogout;
 
   const AppShell({
     super.key,
     required this.store,
+    this.onLogout,
   });
 
   @override
@@ -90,7 +97,11 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _handleLogout() async {
-    await authController.logout();
+    if (widget.onLogout != null) {
+      await widget.onLogout!();
+    } else {
+      await authController.logout();
+    }
   }
 
   @override
@@ -114,10 +125,7 @@ class _AppShellState extends State<AppShell> {
     ];
 
     return Scaffold(
-      body: IndexedStack(
-        index: currentIndex,
-        children: pages,
-      ),
+      body: IndexedStack(index: currentIndex, children: pages),
       bottomNavigationBar: AppBottomNavBar(
         currentIndex: currentIndex,
         onChanged: (index) {

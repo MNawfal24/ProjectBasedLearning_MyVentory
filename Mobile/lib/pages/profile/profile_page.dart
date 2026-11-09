@@ -147,36 +147,9 @@ class ProfilePage extends StatelessWidget {
               const Divider(height: 1),
               _MenuItem(
                 icon: Icons.logout,
-                title: 'Keluar',
-                subtitle: 'Akun akan keluar dari aplikasi',
-                onTap: () async {
-                  final ok = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Keluar?'),
-                      content: const Text('Yakin ingin keluar dari aplikasi?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Batal'),
-                        ),
-                        FilledButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppTheme.danger,
-                          ),
-                          child: const Text('Keluar'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (ok == true && context.mounted) {
-                    final logoutFn = onLogout;
-                    if (logoutFn != null) {
-                      await logoutFn();
-                    }
-                  }
-                },
+                title: 'Logout',
+                subtitle: 'Sign out of your account',
+                onTap: () => _confirmLogout(context),
                 textColor: AppTheme.danger,
               ),
             ],
@@ -184,6 +157,36 @@ class ProfilePage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.danger,
+            ),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout == true && context.mounted) {
+      final logoutFn = onLogout;
+      if (logoutFn != null) {
+        await logoutFn();
+      }
+    }
   }
 
   void _showInfoDialog(BuildContext context, String title, String message) {
