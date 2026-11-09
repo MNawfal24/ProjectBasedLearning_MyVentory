@@ -81,13 +81,13 @@ Dibuat sebagai proyek *Project Based Learning* Semester 5, Politeknik Negeri Mal
 
 Terima kasih kepada para kontributor:
 
-| Kontributor | GitHub | Kontribusi |
+| Kontributor | GitHub |
 |---|---|---|
-| Vanesa Mardiana Putri | [@vanesamrd](https://github.com/vanesamrd) | 12 commit |
-| M. Nawfal Mawla Azhar | [@MNawfal24](https://github.com/MNawfal24) | 8 commit |
-| Arya Bayu Samodra | [@bavucadoz](https://github.com/bavucadoz) | 4 commit |
-| Radit Firansah | [@Raditfiransah](https://github.com/Raditfiransah) | 4 commit |
-| Raya Rabbani | [@RayaRabbani129](https://github.com/RayaRabbani129) | 1 commit |
+| Vanesa Mardiana Putri | [@vanesamrd](https://github.com/vanesamrd) |
+| M. Nawfal Mawla Azhar | [@MNawfal24](https://github.com/MNawfal24) |
+| Arya Bayu Samodra | [@bavucadoz](https://github.com/bavucadoz) |
+| Radit Firansah | [@Raditfiransah](https://github.com/Raditfiransah) |
+| Raya Rabbani | [@RayaRabbani129](https://github.com/RayaRabbani129) |
 
 Repositori: [MNawfal24/ProjectBasedLearning_MyVentory](https://github.com/MNawfal24/ProjectBasedLearning_MyVentory)
 
