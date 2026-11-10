@@ -6,6 +6,7 @@ import { useChartColors } from '../ui';
 
 const props = defineProps({
     points: { type: Array, required: true },
+    height: { type: Number, default: 280 },
 });
 
 const colors = useChartColors();
@@ -77,7 +78,11 @@ const option = computed(() => ({
 
 <template>
     <div>
-        <div v-if="points.length === 0" class="flex h-56 items-center justify-center text-sm text-muted">
+        <div
+            v-if="points.length === 0"
+            class="flex items-center justify-center text-body text-muted"
+            :style="{ height: `${height}px` }"
+        >
             Belum ada transaksi pada periode ini.
         </div>
 
@@ -91,7 +96,13 @@ const option = computed(() => ({
                 </span>
             </div>
 
-            <VChart :option="option" autoresize :style="{ height: '280px' }" role="img" :aria-label="summary" />
+            <VChart
+                :option="option"
+                autoresize
+                :style="{ height: `${height}px` }"
+                role="img"
+                :aria-label="summary"
+            />
         </template>
     </div>
 </template>

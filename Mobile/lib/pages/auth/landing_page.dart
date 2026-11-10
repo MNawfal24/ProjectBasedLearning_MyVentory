@@ -32,8 +32,9 @@ class LandingPage extends StatelessWidget {
                 children: [
                   const SizedBox(height: 40),
                   Container(
-                    width: 96,
-                    height: 96,
+                    width: 112,
+                    height: 112,
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(28),
@@ -45,10 +46,9 @@ class LandingPage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.inventory_2_outlined,
-                      size: 48,
-                      color: AppTheme.primary,
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(height: 24),

@@ -47,6 +47,7 @@
     --color-surface: #ffffff;
     --color-surface-2: #f8fafc;
     --color-line: #e2e8f2;
+    --color-line-strong: #cbd5e3;
     --color-ink: #111827;
     --color-muted: #5b6474;
     --color-primary: #1e5aef;
@@ -58,6 +59,24 @@
     /* Solid action colour stays the same in both themes so white label text keeps its contrast. */
     --color-brand: #1e5aef;
     --color-brand-ink: #ffffff;
+
+    /* Panels sit one radius step above controls, so a surface and a control never
+       read as the same kind of object. */
+    --radius-panel: 0.875rem;
+
+    /* One type ramp. Poppins is wide, so dense text steps down to 13px while
+       headings keep their own size; nothing here is a display face. */
+    --text-2xs: 0.6875rem;
+    --text-2xs--line-height: 1rem;
+    --text-body: 0.8125rem;
+    --text-body--line-height: 1.375rem;
+    --text-metric: 1.375rem;
+    --text-metric--line-height: 1.75rem;
+    --text-display: 1.625rem;
+    --text-display--line-height: 2rem;
+
+    /* The only elevation in the app: the toast, which floats above the page. */
+    --shadow-raised: 0 1px 2px rgb(17 24 39 / 0.04), 0 16px 32px -24px rgb(17 24 39 / 0.45);
 }
 
 .dark {
@@ -65,6 +84,7 @@
     --color-surface: #141a24;
     --color-surface-2: #182030;
     --color-line: #243040;
+    --color-line-strong: #33425a;
     --color-ink: #e8edf6;
     --color-muted: #9aa7ba;
     --color-primary: #7ba2ff;
@@ -75,32 +95,149 @@
     --color-danger-soft: #34191c;
 }
 
+@utility numeric {
+    font-variant-numeric: tabular-nums;
+}
+
 @layer base {
+    html {
+        color-scheme: light;
+    }
+
+    .dark {
+        color-scheme: dark;
+    }
+
     :focus-visible {
         outline: 2px solid var(--color-primary);
         outline-offset: 2px;
     }
 
-    .numeric {
-        font-variant-numeric: tabular-nums;
+    /* Every control states that it can be used; disabled ones state the opposite. */
+    a[href],
+    button,
+    summary,
+    select,
+    label[for],
+    input[type='checkbox'],
+    input[type='radio'],
+    [role='button'],
+    [role='tab'] {
+        cursor: pointer;
+    }
+
+    button:disabled,
+    [aria-disabled='true'] {
+        cursor: not-allowed;
+    }
+
+    ::selection {
+        background-color: var(--color-primary-soft);
+        color: var(--color-ink);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            transition-duration: 0.01ms !important;
+        }
     }
 }
 
 @layer components {
+    /* Surfaces. A panel is a border, never a shadow: the page has one ground plane. */
+    .panel {
+        @apply rounded-panel border border-line bg-surface;
+    }
+
+    .panel-head {
+        @apply flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4;
+    }
+
+    .panel-title {
+        @apply text-body font-semibold text-ink;
+    }
+
+    .panel-hint {
+        @apply mt-1 text-xs leading-relaxed text-muted;
+    }
+
+    .panel-body {
+        @apply px-5 py-4;
+    }
+
+    /* Page opening. One heading, one sentence of context, actions on the same line. */
+    .page-head {
+        @apply flex flex-wrap items-end justify-between gap-4;
+    }
+
+    .page-title {
+        @apply text-display font-semibold tracking-tight text-ink;
+    }
+
+    .page-sub {
+        @apply mt-1.5 text-body text-muted;
+    }
+
+    .page-meta {
+        @apply mt-1 text-2xs text-muted;
+    }
+
+    /* KPI strip: one instrument divided by hairlines, never four separate cards.
+       The 1px gaps are the dividers, so they hold at any column count. */
+    .strip {
+        @apply grid gap-px overflow-hidden rounded-panel border border-line bg-line;
+    }
+
+    .strip-cell {
+        @apply flex flex-col gap-1.5 bg-surface px-5 py-4;
+    }
+
+    .strip-label {
+        @apply text-2xs font-medium text-muted;
+    }
+
+    .strip-value {
+        @apply numeric text-metric font-semibold tracking-tight text-ink;
+    }
+
+    /* Inline text links keep their visual size but carry a 44px hit area, which is
+       what a thumb actually needs on the panels where they sit. */
+    .link-inline {
+        @apply -my-3 inline-flex min-h-11 items-center font-medium text-primary hover:underline;
+    }
+
+    /* Segmented control for period switching: a range picker, not four buttons. */
+    .seg {
+        @apply inline-flex items-center gap-0.5 rounded-lg border border-line bg-surface p-0.5;
+    }
+
+    /* 44px on touch screens, one step tighter with a pointer, so every control
+       clears the minimum tap target without making the desktop chrome heavy. */
+    .seg-item {
+        @apply inline-flex h-11 items-center rounded-md px-3 text-body font-medium text-muted transition-colors hover:text-ink sm:h-8 sm:px-2.5 sm:text-xs;
+    }
+
+    .seg-item-active {
+        @apply bg-primary-soft text-primary;
+    }
+
     .field {
-        @apply h-9 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-xs placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40;
+        @apply h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-body text-ink transition-colors sm:h-9 placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:outline-none;
     }
 
     .btn {
-        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-brand-ink transition-opacity hover:opacity-90 disabled:opacity-60;
+        @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-brand px-3.5 py-2 text-body sm:min-h-9 font-medium text-brand-ink transition-opacity hover:opacity-90 disabled:opacity-60;
     }
 
     .btn-quiet {
-        @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2;
+        @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line bg-surface px-3.5 py-2 text-body sm:min-h-9 font-medium text-ink transition-colors hover:bg-surface-2;
     }
 
     .chip {
-        @apply rounded-lg px-3 py-1.5 text-sm transition-colors;
+        @apply rounded-lg px-3 py-1.5 text-body transition-colors;
     }
 
     .chip-active {
@@ -111,11 +248,16 @@
         @apply text-muted hover:bg-surface-2 hover:text-ink;
     }
 
+    /* Ledger tables: the header is a label row, rows are hairline separated. */
+    .table-head-row {
+        @apply border-b border-line-strong bg-surface-2;
+    }
+
     .th {
-        @apply px-4 py-2.5 text-left text-xs font-medium text-muted;
+        @apply h-10 px-4 text-left text-2xs font-medium text-muted;
     }
 
     .td {
-        @apply px-4 py-3 text-sm text-ink;
+        @apply px-4 py-3 text-body text-ink;
     }
 }

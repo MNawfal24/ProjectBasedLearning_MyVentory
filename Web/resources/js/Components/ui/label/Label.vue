@@ -7,7 +7,7 @@ const props = defineProps({
 </script>
 
 <template>
-    <label :class="cn('block text-xs font-medium text-muted', props.class)">
+    <label :class="cn('block text-2xs font-medium text-muted', props.class)">
         <slot />
     </label>
 </template>

@@ -13,7 +13,7 @@ const model = defineModel({ type: [String, Number], default: '' });
         v-model="model"
         :class="
             cn(
-                'flex h-9 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-xs transition-colors placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50',
+                'flex h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-body text-ink transition-colors sm:h-9 placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
                 props.class,
             )
         "

@@ -7,7 +7,7 @@ const props = defineProps({
 </script>
 
 <template>
-    <div :class="cn('rounded-xl border border-line bg-surface text-ink', props.class)">
+    <div :class="cn('rounded-panel border border-line bg-surface text-ink', props.class)">
         <slot />
     </div>
 </template>

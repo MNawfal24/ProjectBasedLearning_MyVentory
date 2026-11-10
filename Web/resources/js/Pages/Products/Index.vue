@@ -3,13 +3,13 @@ import { Head, useForm } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 import { Badge } from '@/Components/ui/badge';
 import { Button } from '@/Components/ui/button';
-import { Card, CardContent } from '@/Components/ui/card';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table';
 import AppLayout from '../../Layouts/AppLayout.vue';
 import Icon from '../../Components/Icon.vue';
 import Modal from '../../Components/Modal.vue';
+import PageHeader from '../../Components/PageHeader.vue';
 import { formatCurrency, formatNumber } from '../../format';
 import { visitWith } from '../../ui';
 
@@ -77,30 +77,44 @@ function submit() {
     <Head title="Products" />
 
     <AppLayout>
-        <header class="flex flex-wrap items-end justify-between gap-4">
-            <div>
-                <h1 class="text-2xl font-semibold tracking-tight text-ink">Products</h1>
-                <p class="mt-1 text-sm text-muted">Katalog produk yang dipakai form penjualan dan stok.</p>
-            </div>
-            <Button @click="openCreate">
-                <Icon name="plus" :size="16" />
-                Tambah produk
-            </Button>
-        </header>
+        <PageHeader title="Products" description="Katalog produk yang dipakai form penjualan dan stok.">
+            <template #actions>
+                <Button @click="openCreate">
+                    <Icon name="plus" :size="16" />
+                    Tambah produk
+                </Button>
+            </template>
+        </PageHeader>
 
-        <Card class="mt-6">
-            <CardContent class="border-b border-line">
+        <section class="panel mt-8">
+            <div class="border-b border-line px-5 py-4">
                 <Label for="product-search" class="mb-1">Cari produk</Label>
                 <div class="relative max-w-sm">
                     <span class="pointer-events-none absolute left-3 top-2.5 text-muted"><Icon name="search" :size="16" /></span>
                     <Input id="product-search" v-model="search" type="search" class="pl-9" placeholder="Nama produk" />
                 </div>
-            </CardContent>
+            </div>
 
             <template v-if="products.length">
+                <ul class="divide-y divide-line md:hidden">
+                    <li v-for="product in products" :key="product.id" class="px-4 py-3">
+                        <div class="flex items-baseline justify-between gap-3">
+                            <span class="truncate text-body text-ink">{{ product.name }}</span>
+                            <span class="numeric shrink-0 text-body text-ink">{{ formatCurrency(product.sell_price) }}</span>
+                        </div>
+                        <div class="mt-1.5 flex items-center justify-between gap-3">
+                            <p class="text-2xs text-muted">
+                                {{ product.sku ?? 'tanpa SKU' }} &middot; {{ formatNumber(product.sold_quantity) }} terjual
+                            </p>
+                            <button type="button" class="link-inline text-xs" @click="openEdit(product)">Ubah</button>
+                        </div>
+                    </li>
+                </ul>
+
+                <div class="hidden md:block">
                 <Table>
                     <TableHeader>
-                        <TableRow class="hover:bg-transparent">
+                        <TableRow class="table-head-row hover:bg-surface-2">
                             <TableHead>SKU</TableHead>
                             <TableHead>Produk</TableHead>
                             <TableHead>Kategori</TableHead>
@@ -130,12 +144,14 @@ function submit() {
                         </TableRow>
                     </TableBody>
                 </Table>
+                </div>
             </template>
 
-            <div v-else class="px-4 py-12 text-center text-sm text-muted">
-                Tidak ada produk yang cocok. Ubah kata kunci atau tambah produk baru.
+            <div v-else class="px-5 py-14 text-center">
+                <p class="text-body text-muted">Tidak ada produk yang cocok. Ubah kata kunci atau tambah produk baru.</p>
+                <Button v-if="filters.search" variant="outline" class="mt-3" @click="search = ''">Hapus pencarian</Button>
             </div>
-        </Card>
+        </section>
 
         <Modal
             :open="showForm"

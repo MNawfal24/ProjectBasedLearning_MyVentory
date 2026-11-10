@@ -7,7 +7,7 @@ const props = defineProps({
 </script>
 
 <template>
-    <td :class="cn('px-4 py-3 align-middle', props.class)">
+    <td :class="cn('px-4 py-3 align-middle text-body', props.class)">
         <slot />
     </td>
 </template>

@@ -26,8 +26,8 @@ function submit(event) {
     <section class="flex min-h-screen items-center justify-center bg-canvas px-4 py-12 sm:px-6 lg:py-24">
         <Card class="w-full max-w-md shadow-sm">
             <CardHeader class="items-center text-center">
-                <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-                    <span class="h-2.5 w-2.5 rounded-sm bg-brand-ink" aria-hidden="true"></span>
+                <div class="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-line">
+                    <img src="/logo.png" alt="" class="h-full w-full object-contain" />
                 </div>
                 <CardTitle class="mt-4 text-2xl">Buat akun baru</CardTitle>
                 <CardDescription class="text-sm">

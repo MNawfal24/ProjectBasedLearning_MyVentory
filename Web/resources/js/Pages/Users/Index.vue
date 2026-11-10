@@ -3,13 +3,13 @@ import { Head, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { Badge } from '@/Components/ui/badge';
 import { Button } from '@/Components/ui/button';
-import { Card, CardContent } from '@/Components/ui/card';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table';
 import AppLayout from '../../Layouts/AppLayout.vue';
 import Icon from '../../Components/Icon.vue';
 import Modal from '../../Components/Modal.vue';
+import PageHeader from '../../Components/PageHeader.vue';
 import { formatDateTime } from '../../format';
 
 const props = defineProps({
@@ -61,24 +61,40 @@ function submitReset() {
     <Head title="Akun" />
 
     <AppLayout>
-        <header class="flex flex-wrap items-end justify-between gap-4">
-            <div>
-                <h1 class="text-2xl font-semibold tracking-tight text-ink">Akun</h1>
-                <p class="mt-1 text-sm text-muted">
-                    Akun staf untuk aplikasi mobile. Akun ini hanya bisa membaca data; semua perubahan dilakukan dari dashboard.
-                </p>
-            </div>
-            <Button @click="openCreate">
-                <Icon name="plus" :size="16" />
-                Tambah akun mobile
-            </Button>
-        </header>
+        <PageHeader
+            title="Akun"
+            description="Akun staf untuk aplikasi mobile. Akun ini hanya bisa membaca data; semua perubahan dilakukan dari dashboard."
+        >
+            <template #actions>
+                <Button @click="openCreate">
+                    <Icon name="plus" :size="16" />
+                    Tambah akun mobile
+                </Button>
+            </template>
+        </PageHeader>
 
-        <Card class="mt-6">
+        <section class="panel mt-8">
             <template v-if="users.length">
+                <ul class="divide-y divide-line md:hidden">
+                    <li v-for="user in users" :key="user.id" class="px-4 py-3">
+                        <div class="flex items-baseline justify-between gap-3">
+                            <span class="truncate text-body text-ink">{{ user.name }}</span>
+                            <Badge :variant="user.role === 'admin' ? 'default' : 'secondary'" class="shrink-0">
+                                {{ user.role === 'admin' ? 'Admin' : 'Mobile' }}
+                            </Badge>
+                        </div>
+                        <p class="mt-0.5 truncate text-2xs text-muted">{{ user.email }}</p>
+                        <div class="mt-1.5 flex items-baseline justify-between gap-3">
+                            <span class="text-2xs text-muted">Dibuat {{ formatDateTime(user.created_at) }}</span>
+                            <button type="button" class="link-inline text-xs" @click="openReset(user)">Ubah sandi</button>
+                        </div>
+                    </li>
+                </ul>
+
+                <div class="hidden md:block">
                 <Table>
                     <TableHeader>
-                        <TableRow class="hover:bg-transparent">
+                        <TableRow class="table-head-row hover:bg-surface-2">
                             <TableHead>Nama</TableHead>
                             <TableHead>Email</TableHead>
                             <TableHead>Peran</TableHead>
@@ -97,19 +113,20 @@ function submitReset() {
                             </TableCell>
                             <TableCell class="numeric text-xs text-muted">{{ formatDateTime(user.created_at) }}</TableCell>
                             <TableCell class="text-right">
-                                <Button variant="link" size="sm" class="h-auto p-0" @click="openReset(user)">
+                                <button type="button" class="link-inline text-xs" @click="openReset(user)">
                                     Ubah sandi
-                                </Button>
+                                </button>
                             </TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
+                </div>
             </template>
 
-            <div v-else class="px-4 py-12 text-center text-sm text-muted">
-                Belum ada akun. Tambah satu untuk memberi akses aplikasi mobile.
+            <div v-else class="px-5 py-14 text-center">
+                <p class="text-body text-muted">Belum ada akun. Tambah satu untuk memberi akses aplikasi mobile.</p>
             </div>
-        </Card>
+        </section>
 
         <Modal
             :open="showForm"

@@ -7,7 +7,7 @@ const props = defineProps({
 </script>
 
 <template>
-    <th :class="cn('h-10 px-4 py-2.5 text-left align-middle text-xs font-medium text-muted', props.class)">
+    <th :class="cn('h-10 px-4 py-2.5 text-left align-middle text-2xs font-medium whitespace-nowrap text-muted', props.class)">
         <slot />
     </th>
 </template>

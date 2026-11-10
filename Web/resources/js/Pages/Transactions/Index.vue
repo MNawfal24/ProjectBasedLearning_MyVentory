@@ -2,13 +2,13 @@
 import { Head, useForm } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import { Button } from '@/Components/ui/button';
-import { Card, CardContent } from '@/Components/ui/card';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table';
 import AppLayout from '../../Layouts/AppLayout.vue';
 import Icon from '../../Components/Icon.vue';
 import Modal from '../../Components/Modal.vue';
+import PageHeader from '../../Components/PageHeader.vue';
 import Pagination from '../../Components/Pagination.vue';
 import { formatCurrency, formatDateTime, formatNumber } from '../../format';
 import { visitWith } from '../../ui';
@@ -80,27 +80,30 @@ function resetFilters() {
 }
 
 const errorFor = (key) => form.errors[key];
+
+const hasFilters = computed(
+    () => Boolean(props.filters.search || props.filters.outlet || props.filters.payment || props.filters.from || props.filters.to),
+);
 </script>
 
 <template>
     <Head title="Transactions" />
 
     <AppLayout>
-        <header class="flex flex-wrap items-end justify-between gap-4">
-            <div>
-                <h1 class="text-2xl font-semibold tracking-tight text-ink">Transactions</h1>
-                <p class="mt-1 text-sm text-muted">
-                    {{ formatNumber(transactions.total) }} struk tercatat, {{ formatNumber(products.length) }} produk aktif
-                </p>
-            </div>
-            <Button @click="showForm = true">
-                <Icon name="plus" :size="16" />
-                Catat penjualan
-            </Button>
-        </header>
+        <PageHeader
+            title="Transactions"
+            :description="`${formatNumber(transactions.total)} struk tercatat`"
+        >
+            <template #actions>
+                <Button @click="showForm = true">
+                    <Icon name="plus" :size="16" />
+                    Catat penjualan
+                </Button>
+            </template>
+        </PageHeader>
 
-        <Card class="mt-6 gap-0">
-            <CardContent class="flex flex-wrap items-end gap-3 border-b border-line">
+        <section class="panel mt-8">
+            <div class="flex flex-wrap items-end gap-3 border-b border-line px-5 py-4">
                 <div class="min-w-[12rem] flex-1">
                     <Label for="search" class="mb-1">Cari nomor struk</Label>
                     <div class="relative">
@@ -157,13 +160,31 @@ const errorFor = (key) => form.errors[key];
                     />
                 </div>
 
-                <Button variant="outline" @click="resetFilters">Reset</Button>
-            </CardContent>
+                <Button variant="outline" :disabled="!hasFilters" @click="resetFilters">Reset</Button>
+            </div>
 
             <template v-if="transactions.data.length">
+                <!-- Below md the ledger becomes a stacked list: the receipt figure is the
+                     reason to open this page, so it never sits in a hidden column. -->
+                <ul class="divide-y divide-line md:hidden">
+                    <li v-for="row in transactions.data" :key="row.id" class="px-4 py-3">
+                        <div class="flex items-baseline justify-between gap-3">
+                            <span class="numeric text-2xs text-muted">{{ row.receipt_number ?? `#${row.id}` }}</span>
+                            <span class="numeric text-body font-medium text-ink">{{ formatCurrency(row.total_amount) }}</span>
+                        </div>
+                        <p class="mt-0.5 text-2xs text-muted">
+                            {{ formatDateTime(row.occurred_at) }} &middot; {{ row.outlet }} &middot; {{ row.payment_method }}
+                        </p>
+                        <p class="mt-1 text-xs text-ink">
+                            {{ row.items.map((item) => `${item.name} x${item.quantity}`).join(', ') }}
+                        </p>
+                    </li>
+                </ul>
+
+                <div class="hidden md:block">
                 <Table>
                     <TableHeader>
-                        <TableRow class="hover:bg-transparent">
+                        <TableRow class="table-head-row hover:bg-surface-2">
                             <TableHead>Struk</TableHead>
                             <TableHead>Waktu</TableHead>
                             <TableHead>Outlet</TableHead>
@@ -175,32 +196,35 @@ const errorFor = (key) => form.errors[key];
                     </TableHeader>
                     <TableBody>
                         <TableRow v-for="row in transactions.data" :key="row.id">
-                            <TableCell class="numeric whitespace-nowrap text-xs text-muted">{{ row.receipt_number ?? `#${row.id}` }}</TableCell>
-                            <TableCell class="whitespace-nowrap text-xs">{{ formatDateTime(row.occurred_at) }}</TableCell>
+                            <TableCell class="numeric text-2xs whitespace-nowrap text-muted">{{ row.receipt_number ?? `#${row.id}` }}</TableCell>
+                            <TableCell class="text-xs whitespace-nowrap">{{ formatDateTime(row.occurred_at) }}</TableCell>
                             <TableCell class="text-xs">{{ row.outlet }}</TableCell>
                             <TableCell class="max-w-[22rem] text-xs text-muted">
                                 {{ row.items.map((item) => `${item.name} x${item.quantity}`).join(', ') }}
                             </TableCell>
                             <TableCell class="text-xs">
                                 {{ row.payment_method }}
-                                <span v-if="row.uses_loyalty_card" class="ml-1 rounded-md bg-primary-soft px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                <span v-if="row.uses_loyalty_card" class="ml-1 rounded-md bg-primary-soft px-1.5 py-0.5 text-2xs font-medium text-primary">
                                     loyalitas
                                 </span>
                             </TableCell>
-                            <TableCell class="numeric text-right text-xs">{{ formatCurrency(row.net_sales) }}</TableCell>
-                            <TableCell class="numeric text-right">{{ formatCurrency(row.total_amount) }}</TableCell>
+                            <TableCell class="numeric text-right text-xs text-muted">{{ formatCurrency(row.net_sales) }}</TableCell>
+                            <TableCell class="numeric text-right font-medium">{{ formatCurrency(row.total_amount) }}</TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
+                </div>
             </template>
 
-            <div v-else class="px-4 py-12 text-center">
-                <p class="text-sm text-muted">Tidak ada transaksi yang cocok dengan filter ini.</p>
-                <Button variant="outline" class="mt-3" @click="resetFilters">Hapus filter</Button>
+            <div v-else class="px-5 py-14 text-center">
+                <p class="text-body text-muted">
+                    {{ hasFilters ? 'Tidak ada transaksi yang cocok dengan filter ini.' : 'Belum ada transaksi tercatat.' }}
+                </p>
+                <Button v-if="hasFilters" variant="outline" class="mt-3" @click="resetFilters">Hapus filter</Button>
             </div>
 
             <Pagination :paginator="transactions" label="struk" />
-        </Card>
+        </section>
 
         <Modal
             :open="showForm"
@@ -229,7 +253,7 @@ const errorFor = (key) => form.errors[key];
                         </select>
                     </div>
                     <div class="flex items-end pb-2">
-                        <Label class="flex items-center gap-2 text-sm text-ink">
+                        <Label class="flex items-center gap-2 text-body text-ink">
                             <input v-model="form.uses_loyalty_card" type="checkbox" class="h-4 w-4 rounded border-line" />
                             Kartu loyalitas
                         </Label>

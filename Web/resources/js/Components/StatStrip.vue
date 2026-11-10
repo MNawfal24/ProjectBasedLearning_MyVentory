@@ -1,41 +1,49 @@
 <script setup>
 import { computed } from 'vue';
-import { Badge } from '@/Components/ui/badge';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import Icon from './Icon.vue';
 
 const props = defineProps({
     items: { type: Array, required: true },
 });
 
+/*
+ * The strip is read as one instrument, so each cell carries the same three parts:
+ * label, figure, and the comparison the figure was measured against. The caption
+ * is derived by the page, so it stays true when the period or the data changes.
+ */
 const cells = computed(() =>
     props.items.map((item) => {
         const change = item.change_pct;
-        const positive = change !== null && change >= 0;
+        const positive = change !== null && change !== undefined && change >= 0;
 
         return {
             ...item,
             positive,
-            delta: change === null ? null : `${positive ? '+' : ''}${String(change).replace('.', ',')}%`,
+            delta:
+                change === null || change === undefined
+                    ? null
+                    : `${positive ? '+' : ''}${String(change).replace('.', ',')}%`,
         };
     }),
 );
 </script>
 
 <template>
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card v-for="cell in cells" :key="cell.label">
-            <CardHeader class="gap-2">
-                <CardDescription>{{ cell.label }}</CardDescription>
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <CardTitle class="numeric text-2xl">{{ cell.value }}</CardTitle>
-                    <Badge v-if="cell.delta" :variant="cell.positive ? 'default' : 'destructive'" class="gap-1">
-                        <Icon :name="cell.positive ? 'up' : 'down'" :size="12" />
-                        <span class="numeric">{{ cell.delta }}</span>
-                    </Badge>
-                </div>
-                <p class="text-xs text-muted">{{ cell.compare }}</p>
-            </CardHeader>
-        </Card>
+    <div class="strip grid-cols-2 lg:grid-cols-4">
+        <div v-for="cell in cells" :key="cell.label" class="strip-cell">
+            <p class="strip-label">{{ cell.label }}</p>
+            <p class="strip-value">{{ cell.value }}</p>
+            <p v-if="cell.delta || cell.compare" class="flex flex-wrap items-center gap-1.5 text-2xs text-muted">
+                <span
+                    v-if="cell.delta"
+                    class="numeric inline-flex items-center gap-0.5 font-medium"
+                    :class="cell.positive ? 'text-primary' : 'text-danger'"
+                >
+                    <Icon :name="cell.positive ? 'up' : 'down'" :size="12" />
+                    {{ cell.delta }}
+                </span>
+                <span v-if="cell.compare">{{ cell.compare }}</span>
+            </p>
+        </div>
     </div>
 </template>
