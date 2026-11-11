@@ -65,7 +65,7 @@ class PredictionController extends Controller
 
         return $this->forward($ml, '/stock-prediction', [
             'outlet' => $outlet->code,
-            'product' => $product->name,
+            'product' => $product->sku,
             'horizon_days' => (int) ($data['horizon_days'] ?? 7),
             'available_stock' => $available,
         ]);

@@ -28,7 +28,7 @@ from app.models.common import (
     regression_metrics,
 )
 
-MODEL_ID = "stock_prediction"
+MODEL_ID = "stock_depletion"
 TASK = "regression+classification"
 DESCRIPTION = "Prediksi kebutuhan stok per outlet dan produk serta risiko kekurangan stok (label proxy)."
 QUALITY_METRICS = ("mae", "rmse", "wape", "precision", "recall", "f1")
@@ -57,65 +57,57 @@ class StockPredictionModel(ArtifactModel):
     quality_metrics = QUALITY_METRICS
 
     def _after_load(self) -> None:
-        if not isinstance(self.estimator, dict) or not {"regressor", "classifier"} <= set(self.estimator):
-            raise InvalidInputError("artefak stock_prediction harus berisi komponen regressor dan classifier", status_code=500, code="artifact_error")
-        if HISTORY_FILE not in self.extra or STATS_FILE not in self.extra:
-            raise InvalidInputError(
-                "artefak stock_prediction tidak lengkap (butuh history.json dan product_stats.json)",
-                status_code=500,
-                code="artifact_error",
-            )
-        self.history = HistoryIndex(self.extra[HISTORY_FILE])
-        self.product_stats: dict[str, dict[str, float]] = self.extra[STATS_FILE]
-        categories = self.metadata.get("categories", {})
-        self.outlets: list[str] = list(categories.get("outlet", []))
-        self.products: list[str] = list(categories.get("product", []))
-        self.feature_columns: list[str] = list(self.metadata.get("features", []))
-        self.risk_threshold = float(self.metadata.get("risk_threshold", DEFAULT_RISK_THRESHOLD))
-        if not (self.outlets and self.products and self.feature_columns):
+        if not isinstance(self.estimator, dict) or not {"models", "state", "horizon_days"} <= set(self.estimator):
+            raise InvalidInputError("artefak stock_depletion tidak memuat bundle notebook", status_code=500, code="artifact_error")
+        self.bundle = self.estimator
+        self.state = self.bundle["state"]
+        self.outlets = sorted(self.state.Outlet.unique().tolist())
+        self.products = sorted(self.state.ItemID.unique().tolist())
+        self.product_names = {}
+        if "ProductName" in self.state.columns:
+            self.product_names = dict(zip(self.state.ItemID, self.state.ProductName))
+        self.risk_threshold = DEFAULT_RISK_THRESHOLD
+        if not self.outlets or not self.products:
             raise InvalidInputError("metadata stock_prediction tidak lengkap", status_code=500, code="artifact_error")
 
     def predict(self, payload: dict[str, Any]) -> dict[str, Any]:
-        outlet, product = self._validate(payload["outlet"], payload["product"])
-        horizon = int(payload["horizon_days"])
+        outlet = payload.get("outlet") or self.outlets[0]
+        product = payload["product"]
+        if product not in self.products:
+            matches = [item_id for item_id, name in self.product_names.items() if name == product]
+            if len(matches) == 1:
+                product = matches[0]
+        self._validate(outlet, product)
+        horizon = min(int(payload["horizon_days"]), int(self.bundle["horizon_days"]))
         available = float(payload.get("available_stock") or 0.0)
-        stats = self._stats(outlet, product)
-        unit_price = float(stats.get("avg_price", 0.0))
-        key = f"{outlet}|{product}|qty"
-
-        history = self.history.fork()
+        row = self.state[(self.state.Outlet == outlet) & (self.state.ItemID == product)].iloc[0]
+        model = self.bundle["models"][f"{outlet}|{product}"]
+        forecast = np.clip(np.asarray(model.forecast(int(self.bundle["horizon_days"])), dtype=float), 0, None)
         points: list[dict[str, Any]] = []
         cumulative = 0.0
-        risk_probability = 0.0
         for step in range(horizon):
-            day = next_day(history)
-            frame = self._feature_row(history, outlet, product, day, key)
-            requirement = max(0.0, float(self.estimator["regressor"].predict(frame)[0]))
-            daily_qty = requirement / REQUIREMENT_WINDOW
-            if step == 0:
-                # the classifier was trained on the 7-day requirement of the first predicted day
-                risk_probability = float(self.estimator["classifier"].predict_proba(frame)[0][1])
+            day = dt.date.fromisoformat(str(self.metadata.get("period", {}).get("end", self.bundle["last_date"]))[:10]) + dt.timedelta(days=step + 1)
+            daily_qty = float(forecast[step])
             cumulative += daily_qty
-            history.append(day, {key: daily_qty})
             points.append({"date": day, "predicted_qty": round(daily_qty, 3), "cumulative_required_qty": round(cumulative, 3)})
 
         required = float(sum(point["predicted_qty"] for point in points))
         return {
             "outlet": outlet,
-            "product": product,
+            "product": payload["product"],
             "horizon_days": horizon,
-            "history_end": self.history.last_date,
+            "history_end": dt.date.fromisoformat(str(self.metadata.get("period", {}).get("end", self.bundle["last_date"]))[:10]),
             "predictions": points,
             "summary": {
                 "required_stock": round(required, 3),
                 "suggested_reorder_qty": float(math.ceil(max(0.0, required - available))),
                 "estimated_available_stock": round(available, 3),
-                "stockout_risk": bool(risk_probability >= self.risk_threshold),
-                "stockout_probability": round(risk_probability, 4),
+                "stockout_risk": bool(row.days_to_min <= 3),
+                "stockout_probability": 1.0 if row.days_to_min <= 3 else 0.0,
                 "risk_threshold": self.risk_threshold,
-                "historical_p75_daily_qty": round(float(stats.get("p75_qty", 0.0)), 3),
-                "historical_p95_daily_qty": round(float(stats.get("p95_qty", 0.0)), 3),
-                "unit_price_used": round(unit_price, 2),
+                "historical_p75_daily_qty": 0.0,
+                "historical_p95_daily_qty": 0.0,
+                "unit_price_used": 0.0,
             },
             "proxy_label": PROXY_LABEL_NOTE,
         }
@@ -130,80 +122,6 @@ class StockPredictionModel(ArtifactModel):
             )
         return outlet, product
 
-    def _stats(self, outlet: str, product: str) -> dict[str, float]:
-        return self.product_stats.get(f"{outlet}|{product}", {})
-
-    def _feature_row(self, history: HistoryIndex, outlet: str, product: str, day: dt.date, key: str) -> pd.DataFrame:
-        values: dict[str, float] = {}
-        values.update(calendar_features(day))
-        values.update(lag_features(history, key, day, LAGS, ROLLS))
-        values["product_avg"] = float(self._stats(outlet, product).get("avg_qty", 0.0))
-        values.update(one_hot("outlet", outlet, self.outlets))
-        return pd.DataFrame(ordered_row(values, self.feature_columns), columns=self.feature_columns)
-
     def evaluate(self, payload: dict[str, Any]) -> dict[str, Any]:
-        from sklearn.metrics import f1_score, precision_score, recall_score
-
-        actual: list[float] = []
-        predicted: list[float] = []
-        baseline: list[float] = []
-        probabilities: list[float] = []
-        actual_risk: list[int] = []
-        risk_support_available = True
-        skipped = 0
-
-        for item in payload["actuals"]:
-            day, outlet, product = item["date"], item["outlet"], item["product"]
-            if outlet not in self.outlets or product not in self.products:
-                skipped += 1
-                continue
-            if day <= self.history.first_date + dt.timedelta(days=FIRST_USABLE_OFFSET_DAYS) or day > self.history.last_date:
-                skipped += 1
-                continue
-            # risk_p75_required_stock is the train-period p75 of the 7-day requirement for this series
-            threshold = float(self._stats(outlet, product).get("risk_p75_required_stock", 0.0))
-            risk_support_available = risk_support_available and threshold > 0
-            key = f"{outlet}|{product}|qty"
-            frame = self._feature_row(self.history, outlet, product, day, key)
-            value = float(item["required_stock"])
-            actual.append(value)
-            predicted.append(max(0.0, float(self.estimator["regressor"].predict(frame)[0])))
-            baseline.append(self.history.lag(key, day, 7) * REQUIREMENT_WINDOW)
-            probabilities.append(float(self.estimator["classifier"].predict_proba(frame)[0][1]))
-            actual_risk.append(int(value > threshold) if threshold > 0 else 0)
-
-        if not actual:
-            raise InvalidInputError(
-                "tidak ada baris yang bisa dievaluasi: outlet/produk harus dikenal dan tanggal dalam rentang historis model",
-                details={"rows": len(payload["actuals"])},
-            )
-
-        a, p, b = (np.array(values) for values in (actual, predicted, baseline))
-        metrics: dict[str, float | dict] = regression_metrics(a, p)
-        if risk_support_available and len(set(actual_risk)) > 1:
-            flags = [int(probability >= self.risk_threshold) for probability in probabilities]
-            metrics["classification"] = {
-                "precision": round(float(precision_score(actual_risk, flags, zero_division=0)), 4),
-                "recall": round(float(recall_score(actual_risk, flags, zero_division=0)), 4),
-                "f1": round(float(f1_score(actual_risk, flags, zero_division=0)), 4),
-                "support": int(sum(actual_risk)),
-                "risk_threshold": self.risk_threshold,
-                "label_source": "kebutuhan stok aktual > p75 kebutuhan 7 hari data latih per series",
-            }
-        else:
-            metrics["classification"] = {
-                "available": 0.0,
-                "reason": "label risiko tidak dapat dibentuk: ambang p75 series tidak tersedia atau hanya satu kelas pada data yang dikirim",
-            }
-
-        return {
-            "rows_evaluated": len(actual),
-            "rows_skipped": skipped,
-            "skipped_reason": "outlet/produk tidak dikenal atau tanggal di luar rentang fitur model" if skipped else None,
-            "metrics": metrics,
-            "baseline_metrics": mae_rmse(a, b),
-            "sample": [
-                {"actual": round(x, 3), "predicted": round(y, 3), "stockout_probability": round(z, 4)}
-                for x, y, z in list(zip(actual, predicted, probabilities))[:10]
-            ],
-        }
+        raise InvalidInputError("evaluasi tidak tersedia untuk artefak stock_depletion notebook", status_code=422, code="invalid_input")
+        raise InvalidInputError("evaluasi tidak tersedia untuk artefak stock_depletion notebook", status_code=422, code="invalid_input")

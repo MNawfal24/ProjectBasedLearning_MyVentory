@@ -62,9 +62,9 @@ EVALUATION_NOTE = (
 EVALUATION_CONTRACTS: dict[str, type] = {
     "sales_forecast": SalesEvaluationRequest,
     "demand_forecast": DemandEvaluationRequest,
-    "segmentation": SegmentationEvaluationRequest,
+    "product_segmentation": SegmentationEvaluationRequest,
     "peak_hour": PeakHourEvaluationRequest,
-    "stock_prediction": StockEvaluationRequest,
+    "stock_depletion": StockEvaluationRequest,
 }
 
 
@@ -234,7 +234,7 @@ def predict_demand_forecast(payload: DemandForecastRequest, request: Request) ->
     ),
 )
 def predict_segmentation(payload: SegmentationRequest, request: Request) -> dict:
-    return _run("segmentation", "predict", request, lambda model: model.predict(payload.model_dump()), is_inference=True)
+    return _run("product_segmentation", "predict", request, lambda model: model.predict(payload.model_dump()), is_inference=True)
 
 
 @router.post(
@@ -263,7 +263,7 @@ def predict_peak_hour(payload: PeakHourRequest, request: Request) -> dict:
     ),
 )
 def predict_stock_prediction(payload: StockPredictionRequest, request: Request) -> dict:
-    return _run("stock_prediction", "predict", request, lambda model: model.predict(payload.model_dump()), is_inference=True)
+    return _run("stock_depletion", "predict", request, lambda model: model.predict(payload.model_dump()), is_inference=True)
 
 
 @router.post(

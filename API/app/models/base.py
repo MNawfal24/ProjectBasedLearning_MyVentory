@@ -1,7 +1,7 @@
 """Artefact contract for the five model modules.
 
-Each model owns an artefact directory (``<model_id>/<version>/``) with
-``model.joblib`` and ``metadata.json``. A broken artefact raises ``ArtifactError``
+Each model owns an artefact directory (``<model_id>[/<version>]/``) with
+``model.pkl`` and ``metadata.json``. A broken artefact raises ``ArtifactError``
 so the registry can mark that model unavailable instead of failing startup.
 """
 
@@ -11,7 +11,7 @@ import json
 import pathlib
 from typing import Any
 
-import joblib
+import pickle
 
 from app.errors import ArtifactError
 
@@ -32,7 +32,7 @@ class ArtifactModel:
     def load(self) -> "ArtifactModel":
         """Load metadata, side JSON files and the estimator; called once per process."""
         metadata_path = self.artifact_dir / "metadata.json"
-        model_path = self.artifact_dir / "model.joblib"
+        model_path = self.artifact_dir / "model.pkl"
         missing = [path.name for path in (metadata_path, model_path) if not path.exists()]
         if missing:
             raise ArtifactError(
@@ -43,18 +43,20 @@ class ArtifactModel:
             self.metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
             raise ArtifactError(f"metadata.json tidak valid: {exc}", details={"artifact_dir": str(self.artifact_dir)}) from exc
-        self.version = str(self.metadata.get("model_version", self.artifact_dir.name))
+        self.version = str(self.metadata.get("model_version", self.metadata.get("saved_model", {}).get("model_version", "1.0.0")))
         # side files (history.json, product_stats.json, clusters.json, ...) become self.extra[<stem>]
         for path in sorted(self.artifact_dir.glob("*.json")):
             if path.name != "metadata.json":
                 self.extra[path.stem] = json.loads(path.read_text(encoding="utf-8"))
         try:
-            self.estimator = joblib.load(model_path)
+            self.estimator = pickle.load(model_path.open("rb"))
         except Exception as exc:  # noqa: BLE001 - surfaced as a structured 503 for this model only
             raise ArtifactError(
-                f"gagal memuat model.joblib: {exc}",
+                f"gagal memuat model.pkl: {exc}",
                 details={"artifact_dir": str(self.artifact_dir)},
             ) from exc
+        if not self.metadata.get("features") and isinstance(self.estimator, dict):
+            self.metadata["features"] = self.estimator.get("feature_names", [])
         self._after_load()
         return self
 
@@ -75,7 +77,7 @@ class ArtifactModel:
             "description": self.description,
             "algorithm": self.metadata.get("algorithm"),
             "trained_at": self.metadata.get("trained_at"),
-            "features": self.metadata.get("features", []),
+            "features": self.metadata.get("features", self.metadata.get("saved_model", {}).get("feature_names", [])),
             "quality_metrics": list(self.quality_metrics),
             "metrics": self.metadata.get("metrics", {}),
             "notes": self.metadata.get("notes"),

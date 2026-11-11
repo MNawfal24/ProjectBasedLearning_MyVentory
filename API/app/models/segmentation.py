@@ -13,7 +13,7 @@ import numpy as np
 from app.errors import EvaluationNotSupportedError, InvalidInputError
 from app.models.base import ArtifactModel
 
-MODEL_ID = "segmentation"
+MODEL_ID = "product_segmentation"
 TASK = "clustering"
 DESCRIPTION = "Segmentasi transaksi berdasarkan karakteristik keranjang, waktu, dan loyalitas."
 QUALITY_METRICS = ("silhouette", "davies_bouldin")
@@ -38,31 +38,39 @@ class SegmentationModel(ArtifactModel):
     quality_metrics = QUALITY_METRICS
 
     def _after_load(self) -> None:
-        if not isinstance(self.estimator, dict) or not {"scaler", "kmeans"} <= set(self.estimator):
-            raise InvalidInputError("artefak segmentation harus berisi komponen scaler dan kmeans", status_code=500, code="artifact_error")
-        self.feature_columns: list[str] = list(self.metadata.get("features", []))
-        self.clusters: list[dict] = list(self.extra.get(CLUSTERS_FILE, []))
-        self._by_index = {int(entry["cluster"]): entry for entry in self.clusters}
+        if not isinstance(self.estimator, dict) or not {"scaler", "model", "feature_names", "label_map"} <= set(self.estimator):
+            raise InvalidInputError("artefak product_segmentation tidak memuat bundle notebook", status_code=500, code="artifact_error")
+        self.feature_columns = list(self.estimator["feature_names"])
+        self._by_index = {int(key): value for key, value in self.estimator["label_map"].items()}
+        self.clusters = []
+        segments_path = self.artifact_dir / "product_segments.csv"
+        if segments_path.exists():
+            import pandas as pd
+            self.products = pd.read_csv(segments_path).to_dict(orient="records")
+        else:
+            self.products = []
         if not self.feature_columns:
             raise InvalidInputError("metadata segmentation tidak memuat daftar fitur", status_code=500, code="artifact_error")
 
     def predict(self, payload: dict[str, Any]) -> dict[str, Any]:
-        rows = payload["transactions"]
+        rows = payload["transactions"] or [{"product": product} for product in payload.get("products", [])]
+        if not rows:
+            raise InvalidInputError("kirim products atau transactions", details={"field": "products"})
         scaled = self.estimator["scaler"].transform(self._matrix(rows))
-        labels = self.estimator["kmeans"].predict(scaled)
-        centroids = self.estimator["kmeans"].cluster_centers_
+        labels = self.estimator["model"].predict(scaled)
+        centroids = self.estimator["model"].cluster_centers_
 
         assignments = []
         for position, label in enumerate(labels):
             index = int(label)
-            profile = self._by_index.get(index, {})
+            profile = self._by_index.get(index, f"cluster_{index}")
             assignments.append(
                 {
                     "index": position,
                     "cluster": index,
-                    "label": profile.get("label", f"cluster_{index}"),
+                    "label": profile,
                     "distance_to_centroid": round(float(np.linalg.norm(scaled[position] - centroids[index])), 4),
-                    "profile": {key: round(float(value), 4) for key, value in (profile.get("profile") or {}).items()},
+                    "profile": {},
                 }
             )
 
@@ -81,6 +89,15 @@ class SegmentationModel(ArtifactModel):
         """Project request transactions onto the training feature order."""
         matrix = []
         for row in rows:
+            product = row.get("product")
+            if product:
+                match = next((item for item in self.products if item.get("product") == product), None)
+                if match is None:
+                    raise InvalidInputError(f"produk '{product}' tidak dikenal model", details={"total_products": len(self.products)})
+                matrix.append([float(match[column]) for column in self.feature_columns])
+                continue
+            if any(row.get(field) is None for field in ("total_item", "total_amount", "hour", "day_of_week")):
+                raise InvalidInputError("transactions membutuhkan total_item, total_amount, hour, dan day_of_week")
             day_of_week = int(row["day_of_week"])
             derived = {
                 "total_item": float(row["total_item"]),
@@ -102,7 +119,7 @@ class SegmentationModel(ArtifactModel):
 
         rows = payload["transactions"]
         scaled = self.estimator["scaler"].transform(self._matrix(rows))
-        predicted = self.estimator["kmeans"].predict(scaled)
+        predicted = self.estimator["model"].predict(scaled)
         labels = [row.get("cluster") for row in rows]
         has_labels = all(label is not None for label in labels)
         reference = np.array(labels, dtype=int) if has_labels else predicted

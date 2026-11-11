@@ -19,7 +19,7 @@ SALES_FORECAST_EXAMPLE = {"outlet": "SHOP001", "horizon_days": 7}
 class SalesForecastRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", json_schema_extra={"example": SALES_FORECAST_EXAMPLE})
 
-    outlet: str = Field(..., description="Kode outlet, salah satu dari kategori outlet model.", examples=["SHOP001"])
+    outlet: str | None = Field(None, description="Diabaikan oleh artefak notebook yang memprediksi total global.")
     horizon_days: int = Field(7, ge=1, le=14, description="Jumlah hari yang diprediksi, mulai hari setelah data historis terakhir.")
 
 
@@ -49,7 +49,7 @@ class SalesForecastResponse(BaseModel):
     model_version: str
     task: str
     generated_at: dt.datetime
-    outlet: str
+    outlet: str | None
     currency: str = "IDR"
     horizon_days: int
     history_end: dt.date = Field(..., description="Tanggal terakhir yang tersedia di data historis model.")
@@ -94,7 +94,7 @@ DEMAND_FORECAST_EXAMPLE = {"outlet": "SHOP001", "product": "Friendly Coffee (Ice
 class DemandForecastRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", json_schema_extra={"example": DEMAND_FORECAST_EXAMPLE})
 
-    outlet: str = Field(..., description="Kode outlet.", examples=["SHOP001"])
+    outlet: str | None = Field(None, description="Opsional, artefak demand notebook memprediksi total item per produk secara global.")
     product: str = Field(..., description="Nama produk persis seperti pada kategori produk model.", examples=["Friendly Coffee (Ice)"])
     horizon_days: int = Field(7, ge=1, le=14, description="Jumlah hari yang diprediksi.")
 
@@ -119,7 +119,7 @@ class DemandForecastResponse(BaseModel):
     model_version: str
     task: str
     generated_at: dt.datetime
-    outlet: str
+    outlet: str | None
     product: str
     currency: str = "IDR"
     horizon_days: int
@@ -168,17 +168,19 @@ SEGMENTATION_EXAMPLE = {
 class TransactionFeatures(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    total_item: int = Field(..., ge=1, le=50, description="Jumlah item pada struk (TotalItem).")
-    total_amount: float = Field(..., ge=0, le=10_000_000, description="Nilai transaksi (TotalAmount).")
-    hour: int = Field(..., ge=0, le=23, description="Jam transaksi.")
-    day_of_week: int = Field(..., ge=0, le=6, description="Hari dalam minggu, 0 = Senin.")
+    total_item: int | None = Field(None, ge=1, le=50, description="Jumlah item pada struk (legacy contract).")
+    total_amount: float | None = Field(None, ge=0, le=10_000_000, description="Nilai transaksi (legacy contract).")
+    hour: int | None = Field(None, ge=0, le=23, description="Jam transaksi (legacy contract).")
+    day_of_week: int | None = Field(None, ge=0, le=6, description="Hari dalam minggu (legacy contract).")
     use_loyalty_card: bool = Field(False, description="Apakah transaksi memakai kartu loyalitas.")
+    product: str | None = Field(None, description="Nama produk pada artefak product_segmentation.")
 
 
 class SegmentationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", json_schema_extra={"example": SEGMENTATION_EXAMPLE})
 
-    transactions: list[TransactionFeatures] = Field(..., min_length=1, max_length=500, description="Daftar transaksi yang akan dikelompokkan.")
+    transactions: list[TransactionFeatures] = Field(default_factory=list, max_length=500, description="Legacy transaction input.")
+    products: list[str] = Field(default_factory=list, max_length=500, description="Nama produk yang akan disegmentasikan.")
 
 
 class ClusterAssignment(BaseModel):
@@ -233,23 +235,27 @@ PEAK_HOUR_EXAMPLE = {"outlet": "SHOP001"}
 class PeakHourRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", json_schema_extra={"example": PEAK_HOUR_EXAMPLE})
 
-    outlet: str = Field(..., description="Kode outlet.", examples=["SHOP001"])
+    outlet: str | None = Field(None, description="Opsional, artefak peak-hour memakai agregat NetSales per jam.")
     date: dt.date | None = Field(None, description="Tanggal yang diprediksi. Default: hari pertama setelah data historis model.")
 
 
 class HourlyPrediction(BaseModel):
     hour: int
-    predicted_tx_count: float = Field(..., description="Prediksi jumlah struk pada jam tersebut.")
+    predicted_net_sales: float = Field(..., description="Prediksi NetSales pada jam tersebut.")
+    predicted_tx_count: float | None = None
     is_peak: bool = Field(..., description="True bila jam ini diklasifikasikan sebagai jam sibuk.")
     peak_probability: float = Field(..., description="Probabilitas kelas jam sibuk dari classifier.")
 
 
 class PeakHourSummary(BaseModel):
     busiest_hour: int
-    busiest_hour_predicted_tx_count: float
+    busiest_hour_predicted_net_sales: float
     peak_hours: list[int] = Field(..., description="Jam yang diklasifikasikan sibuk pada tanggal ini.")
-    predicted_total_tx: float
-    average_tx_per_hour: float
+    predicted_total_net_sales: float
+    average_net_sales_per_hour: float
+    busiest_hour_predicted_tx_count: float | None = None
+    predicted_total_tx: float | None = None
+    average_tx_per_hour: float | None = None
     reference_peak_hours: list[int] = Field(..., description="Jam sibuk outlet menurut profil rata-rata data latih.")
 
 
@@ -259,7 +265,7 @@ class PeakHourResponse(BaseModel):
     model_version: str
     task: str
     generated_at: dt.datetime
-    outlet: str
+    outlet: str | None
     date: dt.date
     history_end: dt.date
     hours_covered: list[int] = Field(..., description="Jam yang dicakup model (jam operasional pada data latih).")
@@ -313,8 +319,8 @@ STOCK_PREDICTION_EXAMPLE = {"outlet": "SHOP001", "product": "Friendly Coffee (Ic
 class StockPredictionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", json_schema_extra={"example": STOCK_PREDICTION_EXAMPLE})
 
-    outlet: str = Field(..., description="Kode outlet.")
-    product: str = Field(..., description="Nama produk persis seperti pada kategori produk model.")
+    outlet: str | None = Field(None, description="Opsional, artefak stock depletion memakai seri Outlet x ItemID.")
+    product: str = Field(..., description="ItemID persis seperti pada state artefak model.")
     horizon_days: int = Field(7, ge=1, le=14, description="Panjang horizon kebutuhan stok yang diprediksi.")
     available_stock: float = Field(
         0.0,

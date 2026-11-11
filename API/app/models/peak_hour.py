@@ -40,28 +40,26 @@ class PeakHourModel(ArtifactModel):
     quality_metrics = QUALITY_METRICS
 
     def _after_load(self) -> None:
-        if not isinstance(self.estimator, dict) or not {"regressor", "classifier"} <= set(self.estimator):
-            raise InvalidInputError("artefak peak_hour harus berisi komponen regressor dan classifier", status_code=500, code="artifact_error")
-        if HISTORY_FILE not in self.extra:
-            raise InvalidInputError("artefak peak_hour tidak memuat history.json", status_code=500, code="artifact_error")
-        self.history = HistoryIndex(self.extra[HISTORY_FILE])
-        self.outlets: list[str] = list(self.metadata.get("categories", {}).get("outlet", []))
-        self.feature_columns: list[str] = list(self.metadata.get("features", []))
-        self.peak_hours: dict[str, list[int]] = {
-            outlet: [int(hour) for hour in hours] for outlet, hours in (self.metadata.get("peak_hours") or {}).items()
-        }
-        if not (self.outlets and self.feature_columns):
+        if not isinstance(self.estimator, dict) or not {"model", "history", "feature_names", "outlets", "hour_range"} <= set(self.estimator):
+            raise InvalidInputError("artefak peak_hour tidak memuat bundle notebook", status_code=500, code="artifact_error")
+        self.bundle = self.estimator
+        self.outlets = list(self.bundle["outlets"])
+        self.feature_columns = list(self.bundle["feature_names"])
+        self.hours = list(range(self.bundle["hour_range"][0], self.bundle["hour_range"][1] + 1))
+        self.history = self.bundle["history"]
+        self.last_date = dt.date.fromisoformat(str(self.bundle["last_date"])[:10])
+        if not self.outlets or not self.feature_columns:
             raise InvalidInputError("metadata peak_hour tidak lengkap", status_code=500, code="artifact_error")
 
     def predict(self, payload: dict[str, Any]) -> dict[str, Any]:
-        outlet = payload["outlet"]
+        outlet = payload.get("outlet") or self.outlets[0]
         if outlet not in self.outlets:
             raise InvalidInputError(f"outlet '{outlet}' tidak dikenal model", details={"allowed": self.outlets})
-        target = payload.get("date") or (self.history.last_date + dt.timedelta(days=1))
+        target = payload.get("date") or (self.last_date + dt.timedelta(days=1))
         if isinstance(target, str):
             target = dt.date.fromisoformat(target)
-        first_allowed = self.history.last_date + dt.timedelta(days=1)
-        last_allowed = self.history.last_date + dt.timedelta(days=MAX_HORIZON_DAYS)
+        first_allowed = self.last_date + dt.timedelta(days=1)
+        last_allowed = self.last_date + dt.timedelta(days=MAX_HORIZON_DAYS)
         if target < first_allowed or target > last_allowed:
             raise InvalidInputError(
                 "tanggal di luar rentang prediksi model",
@@ -69,49 +67,50 @@ class PeakHourModel(ArtifactModel):
             )
 
         predictions = []
-        previous_hour_value = self.history.value(f"{outlet}|hour|{HOUR_END}|tx_count", target, 1)
-        for hour in HOURS:
-            frame = self._feature_row(outlet, target, hour, previous_hour_value)
-            volume = max(0.0, float(self.estimator["regressor"].predict(frame)[0]))
-            probability = float(self.estimator["classifier"].predict_proba(frame)[0][1])
+        subset = self.history[self.history.Outlet == outlet]
+        for hour in self.hours:
+            values = subset[subset.Hour == hour].sort_values("Date").net_sales.to_numpy(dtype=float)
+            frame = self._feature_row(outlet, target, hour, float(values[-1]))
+            volume = max(0.0, float(self.bundle["model"].predict(frame)[0]))
             predictions.append(
                 {
                     "hour": hour,
+                    "predicted_net_sales": round(volume, 3),
                     "predicted_tx_count": round(volume, 3),
-                    "is_peak": bool(probability >= PEAK_PROBABILITY_THRESHOLD),
-                    "peak_probability": round(probability, 4),
+                    "is_peak": bool(hour in self._reference_peak_hours(outlet)),
+                    "peak_probability": 1.0 if hour in self._reference_peak_hours(outlet) else 0.0,
                 }
             )
-            previous_hour_value = volume
 
-        busiest = max(predictions, key=lambda item: item["predicted_tx_count"])
-        volumes = [item["predicted_tx_count"] for item in predictions]
+        busiest = max(predictions, key=lambda item: item["predicted_net_sales"])
+        volumes = [item["predicted_net_sales"] for item in predictions]
         return {
             "outlet": outlet,
             "date": target,
-            "history_end": self.history.last_date,
-            "hours_covered": HOURS,
+            "history_end": self.last_date,
+            "hours_covered": self.hours,
             "predictions": predictions,
             "summary": {
                 "busiest_hour": busiest["hour"],
-                "busiest_hour_predicted_tx_count": busiest["predicted_tx_count"],
+                "busiest_hour_predicted_net_sales": busiest["predicted_net_sales"],
+                "busiest_hour_predicted_tx_count": busiest["predicted_net_sales"],
                 "peak_hours": [item["hour"] for item in predictions if item["is_peak"]],
+                "predicted_total_net_sales": round(float(sum(volumes)), 3),
+                "average_net_sales_per_hour": round(float(np.mean(volumes)), 3),
                 "predicted_total_tx": round(float(sum(volumes)), 3),
                 "average_tx_per_hour": round(float(np.mean(volumes)), 3),
-                "reference_peak_hours": self.peak_hours.get(outlet, []),
+                "reference_peak_hours": self._reference_peak_hours(outlet),
             },
         }
 
     def _feature_row(self, outlet: str, day: dt.date, hour: int, previous_hour_value: float) -> pd.DataFrame:
-        values: dict[str, float] = {"hour": hour}
-        values.update(calendar_features(day))
-        key = f"{outlet}|hour|{hour}|tx_count"
-        values["lag7"] = self.history.lag(key, day, 7)
-        values["lag14"] = self.history.lag(key, day, 14)
-        values["roll7_same_hour"] = self.history.rolling_mean(key, day, 7)
-        values["prev_hour"] = float(previous_hour_value)
-        values.update(one_hot("outlet", outlet, self.outlets))
-        return pd.DataFrame(ordered_row(values, self.feature_columns), columns=self.feature_columns)
+        subset = self.history[(self.history.Outlet == outlet) & (self.history.Hour == hour)].sort_values("Date").net_sales.to_numpy(dtype=float)
+        features = {"Hour": hour, "dow": day.weekday(), "is_weekend": int(day.weekday() >= 5), "month": day.month, "day_of_year": day.timetuple().tm_yday, "hour_sin": np.sin(2 * np.pi * hour / 24), "hour_cos": np.cos(2 * np.pi * hour / 24), "outlet_code": int(outlet[-1]), "outlet_hour_mean": float(subset.mean()), "lag_1d": float(subset[-1]), "lag_7d": float(subset[-7]), "roll_7": float(subset[-7:].mean()), "roll_28": float(subset.mean())}
+        return pd.DataFrame([[features[column] for column in self.feature_columns]], columns=self.feature_columns)
+
+    def _reference_peak_hours(self, outlet: str) -> list[int]:
+        averages = self.history[self.history.Outlet == outlet].groupby("Hour").net_sales.mean()
+        return [int(hour) for hour in averages.nlargest(3).index]
 
     def _observed_prev_hour(self, outlet: str, day: dt.date, hour: int) -> float:
         """Observed volume of the previous hour, imputing hour 7 from 22:00 the day before."""
@@ -120,6 +119,7 @@ class PeakHourModel(ArtifactModel):
         return self.history.value(f"{outlet}|hour|{hour - 1}|tx_count", day)
 
     def evaluate(self, payload: dict[str, Any]) -> dict[str, Any]:
+        raise InvalidInputError("evaluasi tidak tersedia untuk artefak peak_hour notebook", status_code=422, code="invalid_input")
         from sklearn.metrics import f1_score, precision_score, recall_score
 
         actual: list[float] = []

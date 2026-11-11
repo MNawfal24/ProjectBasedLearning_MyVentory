@@ -64,11 +64,13 @@ class ModelRegistry:
                 logger.info("model %s v%s dimuat dari %s", model_id, model.version, directory)
 
     def _latest_dir(self, model_id: str) -> pathlib.Path | None:
-        """Highest version directory that actually carries a model.joblib."""
+        """Find a flat notebook artifact or the newest versioned artifact."""
         base = self.artifacts_root / model_id
         if not base.is_dir():
             return None
-        candidates = [path for path in base.iterdir() if path.is_dir() and (path / "model.joblib").exists()]
+        if (base / "model.pkl").exists() and (base / "metadata.json").exists():
+            return base
+        candidates = [path for path in base.iterdir() if path.is_dir() and (path / "model.pkl").exists() and (path / "metadata.json").exists()]
         if not candidates:
             return None
 

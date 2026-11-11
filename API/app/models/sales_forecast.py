@@ -36,42 +36,38 @@ class SalesForecastModel(ArtifactModel):
     quality_metrics = QUALITY_METRICS
 
     def _after_load(self) -> None:
-        history = self.extra.get(HISTORY_FILE)
-        if history is None:
-            raise InvalidInputError("artefak sales_forecast tidak memuat history.json", status_code=500, code="artifact_error")
-        self.history = HistoryIndex(history)
-        self.outlets: list[str] = list(self.metadata.get("categories", {}).get("outlet", []))
-        self.feature_columns: list[str] = list(self.metadata.get("features", []))
-        if not self.outlets or not self.feature_columns:
-            raise InvalidInputError("metadata sales_forecast tidak lengkap", status_code=500, code="artifact_error")
+        if not isinstance(self.estimator, dict) or "model" not in self.estimator:
+            raise InvalidInputError("artefak sales_forecast tidak memuat bundle notebook", status_code=500, code="artifact_error")
+        self.bundle = self.estimator
+        self.feature_columns = list(self.bundle["feature_names"])
+        self.history_values = [float(value) for value in self.bundle["history"]]
+        self.last_date = dt.date.fromisoformat(str(self.bundle["last_date"])[:10])
+        self.history_dates = [self.last_date - dt.timedelta(days=len(self.history_values) - index - 1) for index in range(len(self.history_values))]
 
     def predict(self, payload: dict[str, Any]) -> dict[str, Any]:
-        outlet = payload["outlet"]
-        if outlet not in self.outlets:
-            raise InvalidInputError(f"outlet '{outlet}' tidak dikenal model", details={"outlet": outlet, "allowed": self.outlets})
         horizon = int(payload["horizon_days"])
-        history = self.history.fork()
-        key = f"{outlet}|net_sales"
+        history = list(self.history_values)
 
         predictions: list[dict[str, Any]] = []
         for _ in range(horizon):
-            day = next_day(history)
-            value = max(0.0, float(self.estimator.predict(self._feature_row(history, outlet, day, key))[0]))
-            history.append(day, {key: value})
+            day = self.last_date + dt.timedelta(days=len(predictions) + 1)
+            row = self._feature_row(history, day)
+            value = max(0.0, float(self.bundle["model"].predict(row)[0]))
+            history.append(value)
             predictions.append({"date": day, "predicted_net_sales": round(value, 2)})
 
         values = [point["predicted_net_sales"] for point in predictions]
-        recent = self._recent(key, days=7)
+        recent = list(zip(self.history_dates[-7:], self.history_values[-7:]))
         recent_total = float(sum(value for _, value in recent))
         recent_avg = recent_total / len(recent) if recent else 0.0
         predicted_avg = float(np.mean(values)) if values else 0.0
         change = ((predicted_avg - recent_avg) / recent_avg * 100) if recent_avg else 0.0
 
         return {
-            "outlet": outlet,
+            "outlet": None,
             "currency": "IDR",
             "horizon_days": horizon,
-            "history_end": self.history.last_date,
+            "history_end": self.last_date,
             "predictions": predictions,
             "summary": {
                 "total_predicted_net_sales": round(float(sum(values)), 2),
@@ -82,37 +78,29 @@ class SalesForecastModel(ArtifactModel):
             "recent_history": [{"date": day, "net_sales": round(value, 2)} for day, value in recent],
         }
 
-    def _feature_row(self, history: HistoryIndex, outlet: str, day: dt.date, key: str) -> pd.DataFrame:
-        values: dict[str, float] = {}
-        values.update(calendar_features(day))
-        values.update(lag_features(history, key, day, LAGS, ROLLS))
-        values.update(one_hot("outlet", outlet, self.outlets))
-        return pd.DataFrame(ordered_row(values, self.feature_columns), columns=self.feature_columns)
-
-    def _recent(self, key: str, days: int) -> list[tuple[dt.date, float]]:
-        """Last ``days`` observed values, taken from the artefact history (not the forecast)."""
-        return [
-            (self.history.last_date - dt.timedelta(days=offset - 1), self.history.value(key, self.history.last_date - dt.timedelta(days=offset - 1)))
-            for offset in range(days, 0, -1)
-        ]
+    def _feature_row(self, history: list[float], day: dt.date) -> pd.DataFrame:
+        values = {f"lag{lag}": history[-lag] for lag in self.bundle["lags"]}
+        values.update({"roll_mean_7": float(np.mean(history[-7:])), "roll_mean_14": float(np.mean(history[-14:])), "roll_mean_28": float(np.mean(history[-28:])), "roll_std_7": float(np.std(history[-7:]))})
+        values.update({"dow": day.weekday(), "is_weekend": int(day.weekday() >= 5), "day": day.day, "month": day.month, "day_of_year": day.timetuple().tm_yday})
+        return pd.DataFrame([[values[column] for column in self.feature_columns]], columns=self.feature_columns)
 
     def evaluate(self, payload: dict[str, Any]) -> dict[str, Any]:
         rows = payload["actuals"]
         evaluated: list[tuple[float, float, float]] = []
         skipped = 0
         for item in rows:
-            day, outlet = item["date"], item["outlet"]
-            if outlet not in self.outlets or day <= self.history.first_date + dt.timedelta(days=FIRST_USABLE_OFFSET_DAYS) or day > self.history.last_date:
+            day = item["date"]
+            if day <= self.history_dates[FIRST_USABLE_OFFSET_DAYS] or day > self.last_date:
                 skipped += 1
                 continue
-            key = f"{outlet}|net_sales"
-            prediction = max(0.0, float(self.estimator.predict(self._feature_row(self.history, outlet, day, key))[0]))
-            evaluated.append((float(item["net_sales"]), prediction, self.history.lag(key, day, 7)))
+            index = self.history_dates.index(day)
+            prediction = max(0.0, float(self.bundle["model"].predict(self._feature_row(self.history_values[:index], day))[0]))
+            evaluated.append((float(item["net_sales"]), prediction, self.history_values[index - 7]))
 
         if not evaluated:
             raise InvalidInputError(
                 "tidak ada baris yang bisa dievaluasi: tanggal harus berada di dalam rentang data historis model",
-                details={"rows": len(rows), "history_range": [self.history.first_date.isoformat(), self.history.last_date.isoformat()]},
+                details={"rows": len(rows), "history_range": [self.history_dates[0].isoformat(), self.last_date.isoformat()]},
             )
 
         actual = np.array([row[0] for row in evaluated])
