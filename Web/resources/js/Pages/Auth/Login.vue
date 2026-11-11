@@ -22,10 +22,18 @@ function submit(event) {
     <Head title="Masuk" />
 
     <div class="grid min-h-screen bg-canvas lg:grid-cols-[1fr_30rem]">
-        <div class="hidden flex-col justify-between border-r border-line bg-surface px-12 py-12 lg:flex">
+        <div class="hidden flex-col border-r border-line bg-surface px-8 py-8 lg:flex">
             <div class="flex items-center gap-2.5 text-ink">
                 <img src="/logo.png" alt="" class="h-8 w-8 rounded-md object-contain" />
                 <span class="text-[15px] font-semibold tracking-tight">MyVentory</span>
+            </div>
+
+            <div class="flex min-h-0 flex-1 items-center justify-center pt-4">
+                <img
+                    src="/Cheerful Cat Inventory Workspace.png"
+                    alt="Ilustrasi MyVentory"
+                    class="h-full w-full object-contain"
+                />
             </div>
         </div>
 
