@@ -43,21 +43,21 @@
 @theme {
     --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif;
 
-    --color-canvas: #f4f7fb;
+    --color-canvas: #f1f4f9;
     --color-surface: #ffffff;
     --color-surface-2: #f8fafc;
     --color-line: #e2e8f2;
     --color-line-strong: #cbd5e3;
-    --color-ink: #111827;
+    --color-ink: #0f1b3d;
     --color-muted: #5b6474;
-    --color-primary: #1e5aef;
-    --color-primary-soft: #e8eeff;
-    --color-accent: #a14a08;
-    --color-accent-soft: #fef3c7;
+    --color-primary: #1f4dff;
+    --color-primary-soft: #e8edff;
+    --color-accent: #f4b740;
+    --color-accent-soft: #fff5d9;
     --color-danger: #b91c1c;
     --color-danger-soft: #fee2e2;
     /* Solid action colour stays the same in both themes so white label text keeps its contrast. */
-    --color-brand: #1e5aef;
+    --color-brand: #1f4dff;
     --color-brand-ink: #ffffff;
 
     /* Panels sit one radius step above controls, so a surface and a control never
@@ -80,17 +80,17 @@
 }
 
 .dark {
-    --color-canvas: #0c1118;
-    --color-surface: #141a24;
-    --color-surface-2: #182030;
-    --color-line: #243040;
-    --color-line-strong: #33425a;
-    --color-ink: #e8edf6;
-    --color-muted: #9aa7ba;
-    --color-primary: #7ba2ff;
-    --color-primary-soft: #1b2740;
-    --color-accent: #f5b841;
-    --color-accent-soft: #2c2415;
+    --color-canvas: #0f1b3d;
+    --color-surface: #17254d;
+    --color-surface-2: #20315f;
+    --color-line: #344675;
+    --color-line-strong: #506399;
+    --color-ink: #ffffff;
+    --color-muted: #c1cbea;
+    --color-primary: #86a1ff;
+    --color-primary-soft: #263b7a;
+    --color-accent: #f4b740;
+    --color-accent-soft: #5a431b;
     --color-danger: #ff8a8a;
     --color-danger-soft: #34191c;
 }

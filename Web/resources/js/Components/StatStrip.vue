@@ -7,9 +7,9 @@ const props = defineProps({
 });
 
 /*
- * The strip is read as one instrument, so each cell carries the same three parts:
- * label, figure, and the comparison the figure was measured against. The caption
- * is derived by the page, so it stays true when the period or the data changes.
+ * Each KPI is a card with one icon tile, the figure and the comparison it was
+ * measured against. The caption is derived by the page, so it stays true when
+ * the period or the data changes.
  */
 const cells = computed(() =>
     props.items.map((item) => {
@@ -29,21 +29,24 @@ const cells = computed(() =>
 </script>
 
 <template>
-    <div class="strip grid-cols-2 lg:grid-cols-4">
-        <div v-for="cell in cells" :key="cell.label" class="strip-cell">
-            <p class="strip-label">{{ cell.label }}</p>
-            <p class="strip-value">{{ cell.value }}</p>
-            <p v-if="cell.delta || cell.compare" class="flex flex-wrap items-center gap-1.5 text-2xs text-muted">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <article v-for="cell in cells" :key="cell.label" class="panel p-5">
+            <div class="flex items-start justify-between gap-3">
+                <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                    <Icon :name="cell.icon ?? 'overview'" :size="20" />
+                </span>
                 <span
                     v-if="cell.delta"
-                    class="numeric inline-flex items-center gap-0.5 font-medium"
-                    :class="cell.positive ? 'text-primary' : 'text-danger'"
+                    class="numeric inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-2xs font-medium"
+                    :class="cell.positive ? 'bg-primary-soft text-primary' : 'bg-danger-soft text-danger'"
                 >
                     <Icon :name="cell.positive ? 'up' : 'down'" :size="12" />
                     {{ cell.delta }}
                 </span>
-                <span v-if="cell.compare">{{ cell.compare }}</span>
-            </p>
-        </div>
+            </div>
+            <p class="mt-4 text-2xs font-medium text-muted">{{ cell.label }}</p>
+            <p class="numeric mt-1 text-metric font-semibold tracking-tight text-ink">{{ cell.value }}</p>
+            <p v-if="cell.compare" class="mt-1 text-2xs text-muted">{{ cell.compare }}</p>
+        </article>
     </div>
 </template>

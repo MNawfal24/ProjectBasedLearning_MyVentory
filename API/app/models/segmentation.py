@@ -64,24 +64,44 @@ class SegmentationModel(ArtifactModel):
         for position, label in enumerate(labels):
             index = int(label)
             profile = self._by_index.get(index, f"cluster_{index}")
-            assignments.append(
-                {
+            assignment = {
                     "index": position,
                     "cluster": index,
                     "label": profile,
                     "distance_to_centroid": round(float(np.linalg.norm(scaled[position] - centroids[index])), 4),
                     "profile": {},
                 }
-            )
+            if rows[position].get("product"):
+                assignment["product"] = rows[position]["product"]
+            assignments.append(assignment)
 
         distribution: dict[str, int] = {}
         for assignment in assignments:
             distribution[assignment["label"]] = distribution.get(assignment["label"], 0) + 1
 
+        product_rows = {row.get("product"): row for row in self.products}
+        top_products: dict[str, list[dict[str, Any]]] = {}
+        for label in distribution:
+            products = [item.get("product") for item in assignments if item["label"] == label and item.get("product")]
+            ranked = sorted(
+                (product_rows[product] for product in products if product in product_rows),
+                key=lambda row: float(row.get("revenue", 0)),
+                reverse=True,
+            )
+            top_products[label] = [
+                {
+                    "product": row["product"],
+                    "revenue": float(row.get("revenue", 0)),
+                    "quantity": float(row.get("quantity", 0)),
+                }
+                for row in ranked[:5]
+            ]
+
         return {
             "n_transactions": len(assignments),
             "assignments": assignments,
             "cluster_distribution": distribution,
+            "top_products": top_products,
             "clusters_reference": self.clusters,
         }
 

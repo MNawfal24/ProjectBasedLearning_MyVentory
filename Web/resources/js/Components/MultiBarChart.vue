@@ -9,7 +9,7 @@ const props = defineProps({
     series: { type: Array, required: true },
     stack: { type: Boolean, default: false },
     horizontal: { type: Boolean, default: false },
-    height: { type: Number, default: 200 },
+    height: { type: Number, default: 240 },
     suffix: { type: String, default: '' },
 });
 
@@ -18,17 +18,23 @@ const colors = useChartColors();
 const labels = computed(() => (props.horizontal ? [...props.categories].reverse() : props.categories));
 
 const data = computed(() =>
-    props.series.map((serie) => ({
-        name: serie.name,
-        type: 'bar',
-        stack: props.stack ? 'total' : undefined,
-        barMaxWidth: props.horizontal ? 16 : 26,
-        itemStyle: {
-            color: serie.color,
-            borderRadius: props.stack ? 0 : props.horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0],
-        },
-        data: props.horizontal ? [...serie.data].reverse() : serie.data,
-    })),
+    props.series.map((serie, index) => {
+        const values = props.horizontal ? [...serie.data].reverse() : serie.data;
+        const start = index === 0;
+        const end = index === props.series.length - 1;
+        const radius = props.horizontal
+            ? [start ? 6 : 0, end ? 6 : 0, end ? 6 : 0, start ? 6 : 0]
+            : [end ? 6 : 0, end ? 6 : 0, start ? 6 : 0, start ? 6 : 0];
+
+        return {
+            name: serie.name,
+            type: 'bar',
+            stack: props.stack ? 'total' : undefined,
+            barMaxWidth: props.horizontal ? 18 : 30,
+            itemStyle: { color: serie.color, borderRadius: radius },
+            data: values,
+        };
+    }),
 );
 
 const option = computed(() => ({

@@ -5,17 +5,28 @@ namespace App\Http\Controllers;
 use App\Models\Outlet;
 use App\Models\Transaction;
 use App\Services\DashboardStats;
+use App\Services\MlClient;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use RuntimeException;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request, DashboardStats $stats): Response
+    public function index(Request $request, DashboardStats $stats, MlClient $ml): Response
     {
         $days = $request->integer('days', 30);
         $days = in_array($days, DashboardStats::PERIODS, true) ? $days : 30;
         $outletId = $request->integer('outlet') ?: null;
+        try {
+            $response = $ml->post('/sales-forecast', [
+                'outlet' => $outletId ? Outlet::query()->find($outletId)?->code : null,
+                'horizon_days' => 7,
+            ]);
+            $salesForecast = $response->successful() ? $response->json() : ['error' => 'Prediksi penjualan tidak tersedia.'];
+        } catch (RuntimeException) {
+            $salesForecast = ['error' => 'Layanan prediksi sedang tidak tersedia.'];
+        }
 
         return Inertia::render('Dashboard', [
             'stats' => $stats->build($days, $outletId),
@@ -40,6 +51,7 @@ class DashboardController extends Controller
                         'quantity' => $item->quantity,
                     ])->all(),
                 ]),
+            'sales_forecast' => $salesForecast,
         ]);
     }
 }

@@ -16,8 +16,8 @@ const max = computed(() => Math.max(1, ...props.items.map((item) => item.value))
                 <span class="truncate text-ink">{{ item.label }}</span>
                 <span class="numeric shrink-0 text-2xs text-muted">{{ item.display ?? formatNumber(item.value) }}</span>
             </div>
-            <div class="mt-1.5 h-1 overflow-hidden rounded-[2px] bg-surface-2">
-                <div class="h-full rounded-[2px] bg-primary" :style="{ width: `${(item.value / max) * 100}%` }"></div>
+            <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-2">
+                <div class="h-full rounded-full bg-primary" :style="{ width: `${(item.value / max) * 100}%` }"></div>
             </div>
         </li>
     </ol>

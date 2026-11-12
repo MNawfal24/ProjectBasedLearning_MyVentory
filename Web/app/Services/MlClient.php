@@ -13,6 +13,18 @@ use RuntimeException;
  */
 class MlClient
 {
+    public function get(string $endpoint, array $query = []): Response
+    {
+        try {
+            return Http::baseUrl(config('services.ml.base_url'))
+                ->acceptJson()
+                ->timeout((int) config('services.ml.timeout', 10))
+                ->get(ltrim($endpoint, '/'), $query);
+        } catch (ConnectionException $e) {
+            throw new RuntimeException('Layanan prediksi tidak dapat dihubungi.', 0, $e);
+        }
+    }
+
     public function post(string $endpoint, array $payload): Response
     {
         try {

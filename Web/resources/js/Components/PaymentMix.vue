@@ -12,7 +12,7 @@ const total = computed(() => props.items.reduce((sum, item) => sum + item.transa
 
 <template>
     <div v-if="items.length">
-        <div class="flex h-2.5 gap-0.5 overflow-hidden rounded-[3px] bg-surface-2" role="img" aria-label="Porsi metode pembayaran">
+        <div class="flex h-3 gap-0.5 overflow-hidden rounded-full bg-surface-2" role="img" aria-label="Porsi metode pembayaran">
             <div
                 v-for="(item, index) in items"
                 :key="item.method"

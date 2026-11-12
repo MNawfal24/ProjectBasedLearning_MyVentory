@@ -164,7 +164,7 @@ const balanceHint = computed(() =>
                     :series="statusChart.series"
                     stack
                     horizontal
-                    :height="150"
+                    :height="200"
                     suffix=" seri"
                 />
             </Panel>

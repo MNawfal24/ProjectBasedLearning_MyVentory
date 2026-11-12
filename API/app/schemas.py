@@ -189,6 +189,7 @@ class ClusterAssignment(BaseModel):
     label: str
     distance_to_centroid: float
     profile: dict[str, float]
+    product: str | None = None
 
 
 class SegmentationResponse(BaseModel):
@@ -201,6 +202,7 @@ class SegmentationResponse(BaseModel):
     assignments: list[ClusterAssignment]
     cluster_distribution: dict[str, int] = Field(..., description="Jumlah transaksi per label klaster pada request ini.")
     clusters_reference: list[dict] = Field(..., description="Profil seluruh klaster model (dari artefak clusters.json).")
+    top_products: dict[str, list[dict[str, float | str]]] = Field(default_factory=dict, description="Lima produk teratas berdasarkan revenue pada setiap segmen.")
 
 
 class LabelledTransaction(TransactionFeatures):

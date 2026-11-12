@@ -1,76 +1,118 @@
 <script setup>
+import { graphic } from 'echarts/core';
 import { computed } from 'vue';
 import { VChart } from '../echarts';
-import { formatCompact, formatCurrency, formatDate } from '../format';
-import { useChartColors } from '../ui';
+import { formatCompact, formatCurrency, formatDate, formatShortDate } from '../format';
+import { useChartColors, useTheme } from '../ui';
 
 const props = defineProps({
     points: { type: Array, required: true },
+    forecast: { type: Object, default: null },
     height: { type: Number, default: 280 },
 });
 
 const colors = useChartColors();
+const { isDark } = useTheme();
+const forecastPoints = computed(() => props.forecast?.predictions ?? []);
+const chartPoints = computed(() => [...props.points, ...forecastPoints.value]);
+const summary = computed(() => `Tren penjualan harian dengan ${props.points.length} hari aktual dan ${forecastPoints.value.length} hari prediksi.`);
+const labelInterval = computed(() => Math.max(0, Math.ceil(chartPoints.value.length / 5) - 1));
 
-const summary = computed(() => {
-    const total = props.points.reduce((sum, point) => sum + point.revenue, 0);
-    const average = props.points.length ? total / props.points.length : 0;
+function withAlpha(hex, alpha) {
+    const value = hex.replace('#', '');
+    if (value.length !== 6) return hex;
+    return `rgba(${parseInt(value.slice(0, 2), 16)}, ${parseInt(value.slice(2, 4), 16)}, ${parseInt(value.slice(4, 6), 16)}, ${alpha})`;
+}
 
-    return `Tren penjualan harian, ${props.points.length} hari, total ${formatCurrency(total)}, rata-rata ${formatCurrency(average)} per hari.`;
-});
+const areaGradient = computed(
+    () => new graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: withAlpha(colors.value.primary, 0.18) },
+        { offset: 1, color: withAlpha(colors.value.primary, 0) },
+    ]),
+);
+
+const predictionGradient = computed(
+    () => new graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: withAlpha(colors.value.muted, 0.18) },
+        { offset: 1, color: withAlpha(colors.value.muted, 0) },
+    ]),
+);
 
 function tooltip(params) {
-    const point = props.points[params[0].dataIndex];
-    const muted = colors.value.muted;
-    const ink = colors.value.ink;
+    const point = chartPoints.value[params[0].dataIndex];
+    const rows = params.filter((item) => item.value !== undefined && item.value !== null);
+    const primary = rows.find((item) => item.seriesName === 'Penjualan aktual') ?? rows[0];
+    const label = isDark.value ? '#9aa7c2' : '#a7b2c6';
 
-    return [
-        `<p style="font-size:11px;color:${muted}">${formatDate(point.date)}</p>`,
-        `<p style="font-size:12px;font-weight:500;color:${ink}">${formatCurrency(point.revenue)}</p>`,
-        `<p style="font-size:11px;color:${muted}">Rata-rata 7 hari ${formatCurrency(point.moving_average)}</p>`,
-    ].join('');
+    return `
+        <p style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:${label}">${primary.seriesName}</p>
+        <p style="margin-top:4px;font-size:17px;font-weight:600;color:#ffffff">${formatCurrency(primary.value)}</p>
+        <p style="margin-top:2px;font-size:11px;color:${label}">${formatDate(point.date)}</p>
+    `;
 }
 
 const option = computed(() => ({
     animationDuration: 400,
-    grid: { left: 0, right: 8, top: 12, bottom: 0, containLabel: true },
+    grid: { left: 0, right: 8, top: 20, bottom: 0, containLabel: true },
     tooltip: {
         trigger: 'axis',
-        backgroundColor: colors.value.surface,
-        borderColor: colors.value.line,
-        padding: [8, 12],
-        textStyle: { color: colors.value.ink, fontSize: 12 },
+        backgroundColor: isDark.value ? '#20315f' : '#0f1b3d',
+        borderWidth: 0,
+        padding: [10, 14],
+        textStyle: { color: '#ffffff', fontSize: 12 },
+        extraCssText: 'border-radius:10px;box-shadow:0 12px 28px -18px rgba(15,27,61,0.7);',
+        axisPointer: { type: 'line', lineStyle: { color: colors.value.primary, width: 1 }, label: { show: false } },
         formatter: tooltip,
     },
     xAxis: {
         type: 'category',
         boundaryGap: false,
-        data: props.points.map((point) => formatDate(point.date)),
-        axisLine: { lineStyle: { color: colors.value.line } },
+        data: chartPoints.value.map((point) => point.date),
+        axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { color: colors.value.muted, fontSize: 11, hideOverlap: true },
+        axisLabel: {
+            color: colors.value.muted,
+            fontSize: 11,
+            margin: 14,
+            interval: labelInterval.value,
+            formatter: (value) => formatShortDate(value).replace(/^0/, ''),
+        },
+        splitLine: { show: false },
     },
     yAxis: {
         type: 'value',
-        splitLine: { lineStyle: { color: colors.value.line, type: 'dashed' } },
-        axisLabel: { color: colors.value.muted, fontSize: 11, formatter: (value) => formatCompact(value) },
+        min: 0,
+        splitNumber: 4,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: colors.value.muted, fontSize: 10, margin: 10, formatter: (value) => formatCompact(value) },
+        splitLine: { lineStyle: { color: colors.value.line, type: [4, 4] } },
     },
     series: [
         {
-            name: 'Penjualan harian',
+            name: 'Penjualan aktual',
             type: 'line',
+            smooth: 0.35,
             showSymbol: false,
-            data: props.points.map((point) => point.revenue),
-            lineStyle: { width: 2.2, color: colors.value.primary },
-            itemStyle: { color: colors.value.primary },
-            areaStyle: { color: colors.value.primary, opacity: 0.1 },
+            data: [...props.points.map((point) => point.revenue), ...forecastPoints.value.map(() => null)],
+            lineStyle: { width: 2.5, color: colors.value.primary },
+            itemStyle: { color: colors.value.primary, borderColor: colors.value.surface, borderWidth: 2 },
+            areaStyle: { color: areaGradient.value },
+            emphasis: { scale: 1.4 },
         },
         {
-            name: 'Rata-rata bergerak 7 hari',
+            name: 'Prediksi penjualan',
             type: 'line',
+            smooth: 0.35,
             showSymbol: false,
-            data: props.points.map((point) => point.moving_average),
-            lineStyle: { width: 1.5, type: 'dashed', color: colors.value.muted },
-            itemStyle: { color: colors.value.muted },
+            data: [
+                ...props.points.map((point, index) => (index === props.points.length - 1 ? point.revenue : null)),
+                ...forecastPoints.value.map((point) => point.predicted_net_sales),
+            ],
+            lineStyle: { width: 1.5, type: [2, 4], color: colors.value.muted, opacity: 0.85 },
+            itemStyle: { color: colors.value.muted, borderColor: colors.value.surface, borderWidth: 2 },
+            areaStyle: { color: predictionGradient.value },
+            emphasis: { scale: 1.4 },
         },
     ],
 }));
@@ -78,31 +120,7 @@ const option = computed(() => ({
 
 <template>
     <div>
-        <div
-            v-if="points.length === 0"
-            class="flex items-center justify-center text-body text-muted"
-            :style="{ height: `${height}px` }"
-        >
-            Belum ada transaksi pada periode ini.
-        </div>
-
-        <template v-else>
-            <div class="mb-3 flex flex-wrap items-center gap-4 text-xs text-muted">
-                <span class="flex items-center gap-2">
-                    <span class="h-0.5 w-4 rounded-full" :style="{ backgroundColor: colors.primary }"></span> Penjualan harian
-                </span>
-                <span class="flex items-center gap-2">
-                    <span class="h-0.5 w-4 rounded-full border-t border-dashed border-muted"></span> Rata-rata bergerak 7 hari
-                </span>
-            </div>
-
-            <VChart
-                :option="option"
-                autoresize
-                :style="{ height: `${height}px` }"
-                role="img"
-                :aria-label="summary"
-            />
-        </template>
+        <div v-if="!chartPoints.length" class="flex items-center justify-center text-body text-muted" :style="{ height: `${height}px` }">Belum ada data penjualan.</div>
+        <VChart v-else :option="option" autoresize :style="{ height: `${height}px` }" role="img" :aria-label="summary" />
     </div>
 </template>
