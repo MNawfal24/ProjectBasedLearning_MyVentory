@@ -33,7 +33,7 @@ Data ini dipakai di empat tempat:
    sehingga dashboard punya angka nyata.
 2. **Web** — `Stock.csv` diimpor oleh `StockImportSeeder` menjadi saldo stok.
 3. **ML** — menjadi dasar semua fitur model setelah notebook preprocessing.
-4. **Verifikasi** — `docker/verify/click_through.py` memakai angka yang berasal
+4. **Verifikasi** — `Docker/verify/click_through.py` memakai angka yang berasal
    dari impor ini.
 
 Tanggal tidak digeser saat impor: dashboard menampilkan rentang yang benar-benar

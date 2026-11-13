@@ -10,9 +10,9 @@ Didefinisikan di `docker-compose.yml` di root repo.
 | Service | Image | Port | Kapan jalan |
 |---|---|---|---|
 | `db` | `postgres:16-alpine` | 5432 | selalu |
-| `web` | `docker/web/Dockerfile` (target `runtime`) | 8080 | selalu |
+| `web` | `Docker/web/Dockerfile` (target `runtime`) | 8080 | selalu |
 | `api` | `API/Dockerfile` | hanya internal | profil `api` |
-| `test` | `docker/web/Dockerfile` (target `testing`) | - | profil `test`, sekali jalan |
+| `test` | `Docker/web/Dockerfile` (target `testing`) | - | profil `test`, sekali jalan |
 
 `db` punya healthcheck dan `start_period` 30 detik karena pemulihan setelah crash
 pada volume besar bisa memakan beberapa detik. `web` menunggu `db` sehat sebelum
@@ -21,7 +21,7 @@ start, jadi tidak ada migrasi yang gagal karena database belum siap.
 ## Isi folder
 
 ```
-docker/
+Docker/
 ├── db/init-test-database.sql   membuat database myventory_test sekali, saat volume kosong
 ├── web/
 │   ├── Dockerfile              tiga stage: assets, runtime, testing
@@ -33,7 +33,7 @@ docker/
 
 ## Alur start container web
 
-`docker/web/entrypoint.sh` menjalankan urutan berikut:
+`Docker/web/entrypoint.sh` menjalankan urutan berikut:
 
 1. Membuat ulang struktur `storage/` karena volume bernama mulai kosong.
 2. Menyiapkan `APP_KEY`. Bila tidak diberikan lewat environment, kunci dibuat
@@ -103,13 +103,13 @@ docker compose --profile api up -d              # nyalakan layanan ML
 
 ## Verifikasi antarmuka
 
-`docker/verify/click_through.py` membuka dashboard dengan browser sungguhan,
+`Docker/verify/click_through.py` membuka dashboard dengan browser sungguhan,
 menelusuri filter periode, filter outlet, pencarian, form penjualan, form stok,
 form produk, dan tombol tema, lalu mencatat error konsol serta menyimpan tangkapan
-layar ke `docker/verify/shots/`.
+layar ke `Docker/verify/shots/`.
 
 ```bash
-python3 docker/verify/click_through.py http://localhost:8080
+python3 Docker/verify/click_through.py http://localhost:8080
 ```
 
 Skrip ini butuh Playwright di host, bukan di dalam image.

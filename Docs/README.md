@@ -39,7 +39,7 @@ Dashboard web (admin)      ──session───────┘              �
 | `API/` | Layanan FastAPI untuk lima model ML. Tanpa database, tanpa autentikasi, hanya dipanggil Laravel. | [api.md](api.md) |
 | `ML/` | Data transaksi, notebook, dan skrip pembentukan dataset. | [ml.md](ml.md) |
 | `Mobile/` | Aplikasi Flutter untuk staf. Tampilan saja. | [mobile.md](mobile.md) |
-| `docker/` | Dockerfile, entrypoint, konfigurasi Apache, dan skrip verifikasi klik-tembus. | [docker.md](docker.md) |
+| `Docker/` | Dockerfile, entrypoint, konfigurasi Apache, dan skrip verifikasi klik-tembus. | [docker.md](docker.md) |
 
 ## Menjalankan
 

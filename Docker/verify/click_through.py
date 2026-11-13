@@ -3,7 +3,7 @@
 Walks every interactive control, records console errors, and captures screenshots
 at desktop and mobile widths. Run against the compose stack:
 
-    python3 docker/verify/click_through.py http://localhost:8080
+    python3 Docker/verify/click_through.py http://localhost:8080
 """
 
 import datetime as dt
