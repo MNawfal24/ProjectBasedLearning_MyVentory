@@ -18,6 +18,7 @@ from app.errors import ArtifactError
 
 class ArtifactModel:
     model_id: str = ""
+    artifact_folder: str | None = None
     task: str = ""
     description: str = ""
     quality_metrics: tuple[str, ...] = ()
@@ -75,12 +76,34 @@ class ArtifactModel:
             "model_version": self.version,
             "task": self.task,
             "description": self.description,
-            "algorithm": self.metadata.get("algorithm"),
+            "algorithm": (
+                self.metadata.get("algorithm")
+                or self.metadata.get("saved_model", {}).get("algorithm")
+                or self.metadata.get("best_model", {}).get("name")
+                or self.metadata.get("method")
+            ),
             "trained_at": self.metadata.get("trained_at"),
-            "features": self.metadata.get("features", self.metadata.get("saved_model", {}).get("feature_names", [])),
+            "features": (
+                self.metadata.get("features")
+                if isinstance(self.metadata.get("features"), list)
+                else self.metadata.get("feature_names")
+                or self.metadata.get("saved_model", {}).get("feature_names", [])
+            ),
             "quality_metrics": list(self.quality_metrics),
             "metrics": self.metadata.get("metrics", {}),
             "notes": self.metadata.get("notes"),
             "artifact_dir": str(self.artifact_dir),
             "artifacts": sorted(path.name for path in self.artifact_dir.iterdir() if path.is_file()),
+        }
+
+    def reported_metrics(self) -> dict[str, float]:
+        """Best-model quality metrics with lowercase, stable keys."""
+        raw = self.metadata.get("metrics") or {}
+        if raw and all(isinstance(value, dict) for value in raw.values()):
+            best = self.metadata.get("best_model", {}).get("name")
+            raw = raw.get(best) or next(iter(raw.values()), {})
+        return {
+            str(key).lower().replace("_%", ""): float(value)
+            for key, value in raw.items()
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
         }

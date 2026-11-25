@@ -1,6 +1,6 @@
 """FastAPI application: middleware, exception handlers and app assembly.
 
-One application serving the five model modules. Startup never fails because of a
+One application serving the three model modules. Startup never fails because of a
 missing or broken model artefact: ``/api/v1/ready`` reports what loaded.
 """
 
@@ -41,10 +41,9 @@ def create_app() -> FastAPI:
         title=settings.api_title,
         version=settings.api_version,
         description=(
-            "REST API Smart Inventory yang menyediakan lima layanan prediksi machine learning: "
-            "sales forecasting, demand forecasting, transaction segmentation, peak-hour prediction, dan "
-            "stock prediction.\n\n"
-            "Setiap model dimuat dari artefaknya sendiri di ``ML/artifacts/<model_id>/<versi>`` dan "
+            "REST API Smart Inventory yang menyediakan tiga layanan prediksi machine learning: "
+            "sales forecasting, demand forecasting, dan product segmentation.\n\n"
+            "Setiap model dimuat dari artefaknya sendiri di ``API/artifacts/<model_id>/<versi>`` dan "
             "dapat gagal dimuat tanpa menghentikan aplikasi - periksa ``GET /api/v1/ready``.\n\n"
             "Metrik teknis API disimpan in-memory (hilang saat proses restart) dan dipisahkan dari "
             "metrik kualitas model yang berasal dari data uji saat pelatihan."

@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     api_version: str = "1.0.0"
     api_prefix: str = "/api/v1"
 
-    # Directory holding ML/artifacts/<model_id>/<version>/
-    artifacts_root: pathlib.Path = REPO_ROOT / "ML" / "artifacts"
+    # Directory holding API/artifacts/<model_id>/<version>/
+    artifacts_root: pathlib.Path = REPO_ROOT / "API" / "artifacts"
 
     # Number of latency samples kept per (model, endpoint) bucket for percentiles.
     latency_sample_size: int = 2000

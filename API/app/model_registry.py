@@ -1,6 +1,6 @@
-"""Model registry: loading the five models and reporting their readiness.
+"""Model registry: loading the three models and reporting their readiness.
 
-Every model loads independently from ``<artifacts_root>/<model_id>/<version>``.
+Every model loads independently from ``<artifacts_root>/<folder>/<version>``.
 A missing or broken artefact marks only that model ``unavailable`` (with the
 reason) instead of preventing the application from starting.
 """
@@ -15,20 +15,16 @@ from app.config import settings
 from app.errors import ApiError, ModelNotReadyError, UnknownModelError
 from app.models.base import ArtifactModel
 from app.models.demand_forecast import DemandForecastModel
-from app.models.peak_hour import PeakHourModel
 from app.models.sales_forecast import SalesForecastModel
 from app.models.segmentation import SegmentationModel
-from app.models.stock_prediction import StockPredictionModel
 
 logger = logging.getLogger(__name__)
 
-# The five models this API is contracted to serve, in documentation order.
+# The three models this API serves, in documentation order.
 MODEL_CLASSES: dict[str, type[ArtifactModel]] = {
     SalesForecastModel.model_id: SalesForecastModel,
     DemandForecastModel.model_id: DemandForecastModel,
     SegmentationModel.model_id: SegmentationModel,
-    PeakHourModel.model_id: PeakHourModel,
-    StockPredictionModel.model_id: StockPredictionModel,
 }
 
 
@@ -43,11 +39,12 @@ class ModelRegistry:
         self._loaded.clear()
         self._failures.clear()
         for model_id, model_class in MODEL_CLASSES.items():
-            directory = self._latest_dir(model_id)
+            folder = model_class.artifact_folder or model_id
+            directory = self._latest_dir(folder)
             if directory is None:
                 self._failures[model_id] = {
                     "reason": "artefak belum tersedia",
-                    "detail": f"tidak ada direktori model di {self.artifacts_root / model_id}",
+                    "detail": f"tidak ada direktori model di {self.artifacts_root / folder}",
                 }
                 logger.warning("model %s tidak tersedia: artefak tidak ditemukan", model_id)
                 continue
@@ -63,14 +60,18 @@ class ModelRegistry:
                 self._loaded[model_id] = model
                 logger.info("model %s v%s dimuat dari %s", model_id, model.version, directory)
 
-    def _latest_dir(self, model_id: str) -> pathlib.Path | None:
-        """Find a flat notebook artifact or the newest versioned artifact."""
-        base = self.artifacts_root / model_id
+    def _latest_dir(self, folder: str) -> pathlib.Path | None:
+        """Find a flat artifact or the newest versioned artifact."""
+        base = self.artifacts_root / folder
         if not base.is_dir():
             return None
-        if (base / "model.pkl").exists() and (base / "metadata.json").exists():
+        if (base / "model.pkl").exists() or (base / "metadata.json").exists():
             return base
-        candidates = [path for path in base.iterdir() if path.is_dir() and (path / "model.pkl").exists() and (path / "metadata.json").exists()]
+        candidates = [
+            path
+            for path in base.iterdir()
+            if path.is_dir() and ((path / "model.pkl").exists() or (path / "metadata.json").exists())
+        ]
         if not candidates:
             return None
 

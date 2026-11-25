@@ -93,8 +93,8 @@ services:
       context: .
       dockerfile: API/Dockerfile
     volumes:
-      # Model artefacts are not committed; mount them read-only from the host.
-      - ./ML/artifacts:/app/ML/artifacts:ro
+      # Model artefacts are served from the API bundle, mounted read-only from the host.
+      - ./API/artifacts:/app/API/artifacts:ro
     ports:
       - "${API_PORT:-8000}:8000"
     restart: unless-stopped

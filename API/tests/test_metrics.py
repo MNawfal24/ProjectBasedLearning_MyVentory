@@ -65,11 +65,11 @@ def test_endpoint_view_covers_non_model_routes(client):
 
 def test_model_metrics_are_attributed_per_model_and_endpoint(client):
     ready = client.get("/api/v1/ready").json()["ready_models"]
-    if "peak_hour" not in ready:
-        pytest.skip("model peak_hour tidak tersedia")
-    client.post("/api/v1/peak-hour", json={"outlet": "SHOP001"})
-    payload = client.get("/api/v1/metrics/models/peak_hour").json()
-    assert payload["model_id"] == "peak_hour"
+    if "sales_forecast" not in ready:
+        pytest.skip("model sales_forecast tidak tersedia")
+    client.post(SALES, json={"outlet": "SHOP001", "horizon_days": 2})
+    payload = client.get("/api/v1/metrics/models/sales_forecast").json()
+    assert payload["model_id"] == "sales_forecast"
     assert payload["model_version"]
     assert payload["technical"]["inferences"] == 1
     assert [row["endpoint"] for row in payload["endpoints"]] == ["predict"]
@@ -80,7 +80,7 @@ def test_quality_metrics_are_reported_separately_from_technical_metrics(client):
     sales = next(row for row in body["by_model"] if row["model_id"] == "sales_forecast")
     if sales["status"] != "ready":
         pytest.skip("model sales_forecast tidak tersedia")
-    assert {"mae", "rmse", "wape"} <= set(sales["quality"])
+    assert {"mae", "rmse", "mape"} <= set(sales["quality"])
     assert "latency_ms" in sales["technical"]
     assert "latency_ms" not in sales["quality"]
 

@@ -40,7 +40,7 @@ def test_model_list_reports_unavailable_without_quality_metrics(client, empty_ar
 
 
 def test_model_info_of_unavailable_model_returns_503(client, empty_artifacts):
-    response = client.get("/api/v1/models/stock_prediction")
+    response = client.get("/api/v1/models/demand_forecast")
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "model_not_ready"
 
@@ -49,7 +49,7 @@ def test_corrupt_artifact_is_isolated_to_that_model(client, broken_artifact):
     body = client.get("/api/v1/ready").json()
     statuses = {item["model_id"]: item for item in body["models"]}
     assert statuses["sales_forecast"]["status"] == "unavailable"
-    assert "model.joblib" in statuses["sales_forecast"]["reason"]
+    assert "model.pkl" in statuses["sales_forecast"]["reason"]
     # the other models are untouched by the broken artefact
     assert registry.loaded("demand_forecast") is not None
 
@@ -60,14 +60,14 @@ def test_corrupt_artifact_is_isolated_to_that_model(client, broken_artifact):
 
 def test_registry_marks_artifacts_without_metadata_as_unavailable(tmp_path, monkeypatch):
     root = tmp_path / "artifacts"
-    version = root / "segmentation" / "1.0.0"
+    version = root / "product_segmentation" / "1.0.0"
     version.mkdir(parents=True)
-    (version / "model.joblib").write_bytes(b"irrelevant")
+    (version / "model.pkl").write_bytes(b"irrelevant")
     monkeypatch.setattr(registry, "artifacts_root", root)
     registry.load_all()
     try:
-        assert registry.loaded("segmentation") is None
-        assert "metadata.json" in registry.status("segmentation")["reason"]
+        assert registry.loaded("product_segmentation") is None
+        assert "metadata.json" in registry.status("product_segmentation")["reason"]
     finally:
         monkeypatch.undo()
         registry.load_all()

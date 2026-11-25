@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from app.model_registry import MODEL_CLASSES
 
-EXPECTED_MODELS = {"sales_forecast", "demand_forecast", "segmentation", "peak_hour", "stock_prediction"}
+EXPECTED_MODELS = {"sales_forecast", "demand_forecast", "product_segmentation"}
 
 
 def test_model_ids_match_contract():
@@ -26,7 +26,7 @@ def test_health_echoes_incoming_request_id(client):
     assert response.json()["request_id"] == "trace-123"
 
 
-def test_ready_lists_all_five_models_with_status(client):
+def test_ready_lists_all_three_models_with_status(client):
     response = client.get("/api/v1/ready")
     assert response.status_code in (200, 503)
     body = response.json()
@@ -52,7 +52,7 @@ def test_models_endpoint_lists_status_and_quality(client):
     response = client.get("/api/v1/models")
     assert response.status_code == 200
     body = response.json()
-    assert body["total_models"] == 5
+    assert body["total_models"] == 3
     assert body["ready_models"] == len([m for m in body["models"] if m["status"] == "ready"])
     for entry in body["models"]:
         assert {"model_id", "status", "task", "quality", "trained_at"} <= set(entry)
@@ -66,7 +66,7 @@ def test_model_info_returns_identity_features_and_metrics(client):
     assert body["model_version"]
     assert body["features"]
     assert body["algorithm"]
-    assert "model.joblib" in body["artifacts"]
+    assert "model.pkl" in body["artifacts"]
     assert body["metrics"]
 
 
@@ -86,8 +86,6 @@ def test_openapi_documents_every_prediction_endpoint(client):
         "/api/v1/sales-forecast",
         "/api/v1/demand-forecast",
         "/api/v1/segmentation",
-        "/api/v1/peak-hour",
-        "/api/v1/stock-prediction",
         "/api/v1/health",
         "/api/v1/ready",
         "/api/v1/models",

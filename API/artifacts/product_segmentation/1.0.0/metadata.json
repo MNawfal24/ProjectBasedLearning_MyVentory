@@ -1,0 +1,117 @@
+{
+  "project": "MyVentory sales and product segmentation",
+  "method": "K-Means Clustering",
+  "inputs": [
+    "Items",
+    "TotalItem",
+    "NetSales",
+    "Outlet",
+    "Date"
+  ],
+  "source": {
+    "file": "data/Transactions.csv",
+    "rows": 53820,
+    "outlets": [
+      "SHOP001",
+      "SHOP002",
+      "SHOP003"
+    ]
+  },
+  "period": {
+    "start": "2025-01-02",
+    "end": "2025-09-30",
+    "days": 272
+  },
+  "products": 94,
+  "features": {
+    "qty_per_day": "rata-rata item terjual per hari",
+    "rev_per_day": "rata-rata NetSales per hari",
+    "price_per_item": "NetSales dibagi jumlah item",
+    "cv_daily": "koefisien variasi penjualan harian",
+    "momentum": "kemiringan tren dibagi rata-rata harian",
+    "seasonal_strength": "kekuatan pola mingguan dari STL",
+    "weekend_ratio": "rata-rata akhir pekan dibagi hari kerja"
+  },
+  "clustering": {
+    "cluster_count": 4,
+    "random_state": 42,
+    "n_init": 50,
+    "silhouette": 0.1717,
+    "inertia": 386.12,
+    "silhouette_by_k": {
+      "2": 0.2776,
+      "3": 0.1745,
+      "4": 0.1717,
+      "5": 0.1835,
+      "6": 0.1855,
+      "7": 0.1675
+    }
+  },
+  "segments": {
+    "Best Seller": {
+      "products": 29,
+      "qty_per_day": 2.51,
+      "rev_per_day": 67431.0,
+      "share_omzet_%": 35.27,
+      "price_per_item": 26878.0,
+      "momentum": 0.0357,
+      "weekend_ratio": 0.9914,
+      "seasonal_strength": 0.2811
+    },
+    "Regular Seller": {
+      "products": 19,
+      "qty_per_day": 2.4,
+      "rev_per_day": 61398.0,
+      "share_omzet_%": 21.04,
+      "price_per_item": 25560.0,
+      "momentum": 0.0527,
+      "weekend_ratio": 0.8837,
+      "seasonal_strength": 0.2787
+    },
+    "Seasonal Product": {
+      "products": 30,
+      "qty_per_day": 2.37,
+      "rev_per_day": 62146.0,
+      "share_omzet_%": 33.63,
+      "price_per_item": 26271.0,
+      "momentum": 0.0221,
+      "weekend_ratio": 1.0756,
+      "seasonal_strength": 0.2855
+    },
+    "Slow Moving": {
+      "products": 16,
+      "qty_per_day": 2.4,
+      "rev_per_day": 34836.0,
+      "share_omzet_%": 10.05,
+      "price_per_item": 14566.0,
+      "momentum": 0.012,
+      "weekend_ratio": 1.009,
+      "seasonal_strength": 0.3223
+    }
+  },
+  "label_rule": "Best Seller = cluster dengan rev_per_day tertinggi; Slow Moving = terendah; Seasonal Product = weekend_ratio tertinggi di antara dua cluster tengah; sisanya Regular Seller.",
+  "note": "Sebaran quantity antar produk hanya sekitar 1.2x, sehingga kategori tidak dipisahkan oleh volume. Perbedaan utama berasal dari nilai per item, arah tren, dan pola akhir pekan. Silhouette rendah menunjukkan batas antar cluster tidak tajam.",
+  "saved_model": {
+    "file": "model.pkl",
+    "clusters": 4,
+    "feature_names": [
+      "qty_per_day",
+      "rev_per_day",
+      "price_per_item",
+      "cv_daily",
+      "momentum",
+      "seasonal_strength",
+      "weekend_ratio"
+    ]
+  },
+  "artifacts": [
+    "model.pkl",
+    "metadata.json",
+    "product_segments.csv",
+    "segment_profile.csv",
+    "fig_1_elbow_silhouette.png",
+    "fig_2_pca_scatter.png",
+    "fig_3_segment_profile.png",
+    "fig_4_relative_profile.png"
+  ]
+}

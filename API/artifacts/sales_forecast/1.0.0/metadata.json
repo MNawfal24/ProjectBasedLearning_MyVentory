@@ -1,0 +1,268 @@
+{
+  "project": "MyVentory sales forecasting",
+  "notebook": "sales_forecast_exp",
+  "target": "NetSales harian per outlet",
+  "granularity": "harian x outlet",
+  "environment": "conda Machine-Learning (python 3.11.11)",
+  "source": {
+    "file": "data/Transactions.csv",
+    "outlets": [
+      "SHOP001",
+      "SHOP002",
+      "SHOP003"
+    ],
+    "rows": 53820
+  },
+  "period": {
+    "start": "2025-01-02",
+    "end": "2025-09-30",
+    "days": 272
+  },
+  "split": {
+    "train": [
+      "2025-01-02",
+      "2025-08-05"
+    ],
+    "validation": [
+      "2025-08-06",
+      "2025-09-02"
+    ],
+    "test": [
+      "2025-09-03",
+      "2025-09-30"
+    ],
+    "train_days": 216,
+    "validation_days": 28,
+    "test_days": 28
+  },
+  "seasonality": {
+    "season_length_days": 7,
+    "stl_strength": 0.7698
+  },
+  "features": [
+    "lag_1",
+    "lag_7",
+    "lag_14",
+    "lag_28",
+    "roll_mean_7",
+    "roll_mean_14",
+    "roll_mean_28",
+    "roll_std_7",
+    "roll_std_14",
+    "roll_std_28",
+    "dow",
+    "is_weekend",
+    "day",
+    "month",
+    "day_of_year",
+    "week_of_year",
+    "outlet_id"
+  ],
+  "config": {
+    "stat": {
+      "SARIMA": {
+        "SHOP001": {
+          "order": [
+            2,
+            1,
+            2
+          ],
+          "seasonal_order": [
+            1,
+            1,
+            1,
+            7
+          ],
+          "AIC": 5581.049807165037
+        },
+        "SHOP002": {
+          "order": [
+            2,
+            1,
+            2
+          ],
+          "seasonal_order": [
+            1,
+            1,
+            1,
+            7
+          ],
+          "AIC": 5449.06570158867
+        },
+        "SHOP003": {
+          "order": [
+            1,
+            1,
+            2
+          ],
+          "seasonal_order": [
+            1,
+            1,
+            1,
+            7
+          ],
+          "AIC": 5579.525398107293
+        }
+      },
+      "ETS": {
+        "SHOP001": {
+          "smoothing_level": 0.2418,
+          "smoothing_trend": 0.0,
+          "smoothing_seasonal": 0.0478,
+          "damping_trend": 0.8
+        },
+        "SHOP002": {
+          "smoothing_level": 0.1807,
+          "smoothing_trend": 0.0087,
+          "smoothing_seasonal": 0.0708,
+          "damping_trend": 0.9139
+        },
+        "SHOP003": {
+          "smoothing_level": 0.3092,
+          "smoothing_trend": 0.0,
+          "smoothing_seasonal": 0.0549,
+          "damping_trend": 0.9546
+        }
+      }
+    },
+    "ml": {
+      "CatBoost Global": {
+        "loss_function": "MAE",
+        "depth": 3,
+        "learning_rate": 0.02,
+        "iterations": 975,
+        "l2_leaf_reg": 3.0,
+        "eval_metric": "MAE",
+        "random_seed": 42
+      },
+      "LightGBM Global": {
+        "n_estimators": 800,
+        "learning_rate": 0.03,
+        "num_leaves": 31
+      },
+      "XGBoost Global": {
+        "n_estimators": 800,
+        "learning_rate": 0.03,
+        "max_depth": 4
+      },
+      "Gradient Boosting Global": {
+        "n_estimators": 400,
+        "learning_rate": 0.05,
+        "max_depth": 3
+      }
+    },
+    "dl": {
+      "LSTM Global": {
+        "window": 28,
+        "layers": [
+          "LSTM 64 (return_sequences)",
+          "Dropout 0.2",
+          "LSTM 32",
+          "Dense 16 outlet embedding",
+          "Concat",
+          "Dropout 0.2",
+          "Dense 16 relu",
+          "Dense 1"
+        ],
+        "optimizer": "Adam 1e-3",
+        "loss": "mse",
+        "batch_size": 16,
+        "epochs_trained": 7,
+        "scaler": "MinMaxScaler 0-1 (fit pada train)",
+        "random_state": 42
+      }
+    }
+  },
+  "metrics": {
+    "Gradient Boosting Global": {
+      "family": "ml",
+      "MAE": 203115.3,
+      "RMSE": 268753.27,
+      "MAPE_%": 4.97,
+      "sMAPE_%": 4.98,
+      "bias": 18927.48
+    },
+    "CatBoost Global": {
+      "family": "ml",
+      "MAE": 229073.93,
+      "RMSE": 293508.45,
+      "MAPE_%": 5.63,
+      "sMAPE_%": 5.61,
+      "bias": 44981.82
+    },
+    "XGBoost Global": {
+      "family": "ml",
+      "MAE": 235818.88,
+      "RMSE": 310811.63,
+      "MAPE_%": 5.88,
+      "sMAPE_%": 5.77,
+      "bias": 82970.78
+    },
+    "LightGBM Global": {
+      "family": "ml",
+      "MAE": 270071.19,
+      "RMSE": 339473.23,
+      "MAPE_%": 6.79,
+      "sMAPE_%": 6.57,
+      "bias": 157950.35
+    },
+    "ETS": {
+      "family": "stat",
+      "MAE": 295156.15,
+      "RMSE": 371250.97,
+      "MAPE_%": 7.44,
+      "sMAPE_%": 7.17,
+      "bias": 201396.52
+    },
+    "LSTM Global": {
+      "family": "dl",
+      "MAE": 295252.63,
+      "RMSE": 363854.4,
+      "MAPE_%": 7.49,
+      "sMAPE_%": 7.18,
+      "bias": 216549.39
+    },
+    "SARIMA": {
+      "family": "stat",
+      "MAE": 330877.11,
+      "RMSE": 415601.88,
+      "MAPE_%": 8.3,
+      "sMAPE_%": 7.93,
+      "bias": 224217.19
+    },
+    "Naive-7": {
+      "family": "baseline",
+      "MAE": 520978.12,
+      "RMSE": 630538.65,
+      "MAPE_%": 12.91,
+      "sMAPE_%": 12.4,
+      "bias": 191763.19
+    }
+  },
+  "best_model": {
+    "name": "Gradient Boosting Global",
+    "family": "ml",
+    "file": "model.pkl",
+    "trained_on_days": 272,
+    "last_date": "2025-09-30",
+    "horizon_days": 7,
+    "mae_test": 203115.3
+  },
+  "artifacts": [
+    "model.pkl",
+    "metadata.json",
+    "sales_forecast_exp_daily.csv",
+    "sales_forecast_exp_comparison.csv",
+    "sales_forecast_exp_per_outlet.csv",
+    "sales_forecast_exp_future.csv",
+    "fig_1_series.png",
+    "fig_2_lstm_training.png",
+    "fig_3_test_forecast.png",
+    "fig_4_metrics.png",
+    "fig_5_feature_importance.png",
+    "fig_6_residuals.png"
+  ],
+  "model_id": "sales_forecast",
+  "model_version": "1.0.0",
+  "source_notebook": "sales_forecast"
+}

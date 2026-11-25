@@ -1,4 +1,4 @@
-"""Test configuration: a temp artefacts root so tests never touch ML/artifacts."""
+"""Test configuration: a temp artefacts root so tests never touch API/artifacts."""
 
 from __future__ import annotations
 
@@ -18,7 +18,8 @@ from app.metrics import metrics_store  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.model_registry import registry  # noqa: E402
 
-REAL_ARTIFACTS = REPO_ROOT / "ML" / "artifacts"
+REAL_ARTIFACTS = REPO_ROOT / "API" / "artifacts"
+FOLDER_ALIASES = {"demand_forecast": "demand_forecast_product"}
 
 
 @pytest.fixture(scope="session")
@@ -47,7 +48,7 @@ def empty_artifacts(tmp_path, monkeypatch) -> pathlib.Path:
 
 @pytest.fixture
 def broken_artifact(tmp_path, monkeypatch) -> pathlib.Path:
-    """Copy every real artefact, then corrupt one model.joblib to test load-failure isolation."""
+    """Copy every real artefact, then corrupt one model.pkl to test load-failure isolation."""
     root = tmp_path / "artifacts"
     root.mkdir()
     if not (REAL_ARTIFACTS / "sales_forecast").is_dir():
@@ -56,7 +57,7 @@ def broken_artifact(tmp_path, monkeypatch) -> pathlib.Path:
         if source.is_dir():
             shutil.copytree(source, root / source.name)
     version_dir = next(path for path in (root / "sales_forecast").iterdir() if path.is_dir())
-    (version_dir / "model.joblib").write_bytes(b"not-a-pickle")
+    (version_dir / "model.pkl").write_bytes(b"not-a-pickle")
     monkeypatch.setattr(settings, "artifacts_root", root)
     monkeypatch.setattr(registry, "artifacts_root", root)
     registry.load_all()
@@ -67,7 +68,7 @@ def broken_artifact(tmp_path, monkeypatch) -> pathlib.Path:
 
 
 def artifact_dir(model_id: str) -> pathlib.Path:
-    base = REAL_ARTIFACTS / model_id
+    base = REAL_ARTIFACTS / FOLDER_ALIASES.get(model_id, model_id)
     versions = sorted(path for path in base.iterdir() if path.is_dir())
     return versions[-1]
 

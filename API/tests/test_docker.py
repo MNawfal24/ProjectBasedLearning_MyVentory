@@ -5,7 +5,7 @@ Heavy by nature, so it only runs when explicitly requested::
     MYVENTORY_DOCKER_TEST=1 pytest -m docker -v
 
 Builds the image with ``API/Dockerfile`` and the repository root as build context
-(needed so ``ML/artifacts`` lands in the image), starts the container, then
+(needed so ``API/artifacts`` lands in the image), starts the container, then
 checks the health endpoint and the Swagger schema served from inside it.
 """
 
@@ -74,7 +74,7 @@ def test_container_serves_health_and_readiness(container):
     with urllib.request.urlopen(f"{BASE_URL}/api/v1/ready", timeout=10) as response:  # noqa: S310
         body = json.loads(response.read())
     assert body["status"] in ("ready", "not_ready")
-    assert len(body["models"]) == 5
+    assert len(body["models"]) == 3
 
 
 def test_container_serves_swagger_and_openapi(container):
@@ -85,15 +85,13 @@ def test_container_serves_swagger_and_openapi(container):
 
 
 def test_container_predicts_with_bundled_artifacts(container):
-    """The image must carry the model artefacts and load all five of them."""
+    """The image must carry the model artefacts and load all three of them."""
     with urllib.request.urlopen(f"{BASE_URL}/api/v1/ready", timeout=10) as response:  # noqa: S310
         ready = json.loads(response.read())
     assert sorted(ready["ready_models"]) == [
         "demand_forecast",
-        "peak_hour",
+        "product_segmentation",
         "sales_forecast",
-        "segmentation",
-        "stock_prediction",
     ], ready
 
     request = urllib.request.Request(  # noqa: S310 - fixed localhost URL
@@ -124,4 +122,4 @@ def test_container_runs_as_non_root_without_baked_secrets(container):
     # runtime config must come from environment variables, not from baked files
     config = run(["docker", "exec", CONTAINER_NAME, "python", "-c", "from app.config import settings; print(settings.artifacts_root)"])
     assert config.returncode == 0, config.stderr
-    assert config.stdout.strip() == "/app/ML/artifacts"
+    assert config.stdout.strip() == "/app/API/artifacts"

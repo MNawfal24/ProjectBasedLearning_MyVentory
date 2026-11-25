@@ -1,34 +1,22 @@
-"""Transaction segmentation: StandardScaler + KMeans over receipt features.
-
-The artefact bundles ``clusters.json`` with a profile per cluster, so a response
-can carry a readable label next to the raw cluster index.
-"""
+"""Product segmentation: KMeans over seven product-level sales features."""
 
 from __future__ import annotations
 
+import json
+from collections import Counter
 from typing import Any
 
 import numpy as np
+import pandas as pd
+from sklearn.metrics import davies_bouldin_score, silhouette_score
 
-from app.errors import EvaluationNotSupportedError, InvalidInputError
+from app.errors import ArtifactError, EvaluationNotSupportedError, InvalidInputError
 from app.models.base import ArtifactModel
 
 MODEL_ID = "product_segmentation"
 TASK = "clustering"
-DESCRIPTION = "Segmentasi transaksi berdasarkan karakteristik keranjang, waktu, dan loyalitas."
-QUALITY_METRICS = ("silhouette", "davies_bouldin")
-
-CLUSTERS_FILE = "clusters"
-
-# Training feature column -> API request field.
-FEATURE_SOURCES = {
-    "total_item": "total_item",
-    "total_amount": "total_amount",
-    "hour": "hour",
-    "dow": "day_of_week",
-    "is_weekend": "is_weekend",
-    "use_loyalty_card": "use_loyalty_card",
-}
+DESCRIPTION = "Segmentasi produk menjadi Best Seller, Regular Seller, Seasonal Product, atau Slow Moving."
+QUALITY_METRICS = ("silhouette", "davies_bouldin", "label_agreement")
 
 
 class SegmentationModel(ArtifactModel):
@@ -38,129 +26,115 @@ class SegmentationModel(ArtifactModel):
     quality_metrics = QUALITY_METRICS
 
     def _after_load(self) -> None:
-        if not isinstance(self.estimator, dict) or not {"scaler", "model", "feature_names", "label_map"} <= set(self.estimator):
-            raise InvalidInputError("artefak product_segmentation tidak memuat bundle notebook", status_code=500, code="artifact_error")
-        self.feature_columns = list(self.estimator["feature_names"])
-        self._by_index = {int(key): value for key, value in self.estimator["label_map"].items()}
-        self.clusters = []
-        segments_path = self.artifact_dir / "product_segments.csv"
-        if segments_path.exists():
-            import pandas as pd
-            self.products = pd.read_csv(segments_path).to_dict(orient="records")
+        bundle = self.estimator
+        required = {"scaler", "model", "feature_names", "label_map"}
+        if not isinstance(bundle, dict) or not required.issubset(bundle):
+            raise ArtifactError("artefak product_segmentation bukan bundle segmentasi produk")
+        self.scaler = bundle["scaler"]
+        self.kmeans = bundle["model"]
+        self.feature_columns = list(bundle["feature_names"])
+        self.label_map = {int(cluster): str(label) for cluster, label in bundle["label_map"].items()}
+
+        csv_path = self.artifact_dir / "product_segments.csv"
+        if not csv_path.exists():
+            raise ArtifactError("product_segments.csv tidak ditemukan", details={"artifact_dir": str(self.artifact_dir)})
+        frame = pd.read_csv(csv_path)
+        missing = [column for column in ["product", "cluster", "revenue", *self.feature_columns] if column not in frame.columns]
+        if missing:
+            raise ArtifactError("product_segments.csv tidak lengkap", details={"missing": missing})
+        self.products: list[dict[str, Any]] = json.loads(frame.to_json(orient="records"))
+        self._by_name = {str(row["product"]): row for row in self.products}
+
+        profile_path = self.artifact_dir / "segment_profile.csv"
+        if profile_path.exists():
+            self.clusters_reference: list[dict[str, Any]] = json.loads(pd.read_csv(profile_path).to_json(orient="records"))
         else:
-            self.products = []
-        if not self.feature_columns:
-            raise InvalidInputError("metadata segmentation tidak memuat daftar fitur", status_code=500, code="artifact_error")
-
-    def predict(self, payload: dict[str, Any]) -> dict[str, Any]:
-        rows = payload["transactions"] or [{"product": product} for product in payload.get("products", [])]
-        if not rows:
-            raise InvalidInputError("kirim products atau transactions", details={"field": "products"})
-        scaled = self.estimator["scaler"].transform(self._matrix(rows))
-        labels = self.estimator["model"].predict(scaled)
-        centroids = self.estimator["model"].cluster_centers_
-
-        assignments = []
-        for position, label in enumerate(labels):
-            index = int(label)
-            profile = self._by_index.get(index, f"cluster_{index}")
-            assignment = {
-                    "index": position,
-                    "cluster": index,
-                    "label": profile,
-                    "distance_to_centroid": round(float(np.linalg.norm(scaled[position] - centroids[index])), 4),
-                    "profile": {},
-                }
-            if rows[position].get("product"):
-                assignment["product"] = rows[position]["product"]
-            assignments.append(assignment)
-
-        distribution: dict[str, int] = {}
-        for assignment in assignments:
-            distribution[assignment["label"]] = distribution.get(assignment["label"], 0) + 1
-
-        product_rows = {row.get("product"): row for row in self.products}
-        top_products: dict[str, list[dict[str, Any]]] = {}
-        for label in distribution:
-            products = [item.get("product") for item in assignments if item["label"] == label and item.get("product")]
-            ranked = sorted(
-                (product_rows[product] for product in products if product in product_rows),
-                key=lambda row: float(row.get("revenue", 0)),
-                reverse=True,
-            )
-            top_products[label] = [
+            self.clusters_reference = [
                 {
-                    "product": row["product"],
-                    "revenue": float(row.get("revenue", 0)),
-                    "quantity": float(row.get("quantity", 0)),
+                    "cluster": cluster,
+                    "segment": self.label_map.get(cluster, f"Cluster {cluster}"),
+                    "centroid": {column: float(value) for column, value in zip(self.feature_columns, row)},
                 }
-                for row in ranked[:5]
+                for cluster, row in enumerate(np.asarray(self.kmeans.cluster_centers_))
             ]
 
-        return {
-            "n_transactions": len(assignments),
-            "assignments": assignments,
-            "cluster_distribution": distribution,
-            "top_products": top_products,
-            "clusters_reference": self.clusters,
-        }
+    def _rows(self, names: list[str]) -> list[dict[str, Any]]:
+        missing = [name for name in names if name not in self._by_name]
+        if missing:
+            raise InvalidInputError(
+                "sebagian produk tidak ada pada artefak segmentasi",
+                details={"missing_products": missing[:20], "n_missing": len(missing)},
+            )
+        return [self._by_name[name] for name in names]
 
     def _matrix(self, rows: list[dict[str, Any]]) -> np.ndarray:
-        """Project request transactions onto the training feature order."""
-        matrix = []
-        for row in rows:
-            product = row.get("product")
-            if product:
-                match = next((item for item in self.products if item.get("product") == product), None)
-                if match is None:
-                    raise InvalidInputError(f"produk '{product}' tidak dikenal model", details={"total_products": len(self.products)})
-                matrix.append([float(match[column]) for column in self.feature_columns])
-                continue
-            if any(row.get(field) is None for field in ("total_item", "total_amount", "hour", "day_of_week")):
-                raise InvalidInputError("transactions membutuhkan total_item, total_amount, hour, dan day_of_week")
-            day_of_week = int(row["day_of_week"])
-            derived = {
-                "total_item": float(row["total_item"]),
-                "total_amount": float(row["total_amount"]),
-                "hour": float(row["hour"]),
-                "day_of_week": float(day_of_week),
-                "is_weekend": float(day_of_week >= 5),
-                "use_loyalty_card": float(int(bool(row.get("use_loyalty_card", False)))),
-            }
-            values = {column: derived[source] for column, source in FEATURE_SOURCES.items()}
-            missing = [column for column in self.feature_columns if column not in values]
-            if missing:
-                raise InvalidInputError(f"fitur model tidak dapat dibentuk dari request: {missing}", details={"features": self.feature_columns})
-            matrix.append([values[column] for column in self.feature_columns])
-        return np.array(matrix, dtype=float)
+        return np.asarray([[float(row[column]) for column in self.feature_columns] for row in rows], dtype=float)
 
-    def evaluate(self, payload: dict[str, Any]) -> dict[str, Any]:
-        from sklearn.metrics import davies_bouldin_score, silhouette_score
+    def predict(self, payload: dict[str, Any]) -> dict[str, Any]:
+        names = [str(name) for name in payload.get("products") or []]
+        rows = self._rows(names)
+        scaled = self.scaler.transform(self._matrix(rows))
+        labels = np.asarray(self.kmeans.predict(scaled), dtype=int)
+        distances = np.asarray(self.kmeans.transform(scaled), dtype=float)
 
-        rows = payload["transactions"]
-        scaled = self.estimator["scaler"].transform(self._matrix(rows))
-        predicted = self.estimator["model"].predict(scaled)
-        labels = [row.get("cluster") for row in rows]
-        has_labels = all(label is not None for label in labels)
-        reference = np.array(labels, dtype=int) if has_labels else predicted
-
-        unique = np.unique(reference)
-        if len(unique) < 2:
-            raise EvaluationNotSupportedError(
-                "Silhouette dan Davies-Bouldin hanya valid bila terdapat minimal dua klaster berbeda pada data yang dikirim",
-                details={"rows": len(rows), "n_labels": int(len(unique))},
+        assignments: list[dict[str, Any]] = []
+        for row, cluster, row_distances in zip(rows, labels, distances):
+            cluster = int(cluster)
+            assignments.append(
+                {
+                    "product": str(row["product"]),
+                    "cluster": cluster,
+                    "label": self.label_map.get(cluster, f"Cluster {cluster}"),
+                    "distance_to_centroid": round(float(row_distances[cluster]), 4),
+                    "profile": {
+                        **{column: float(row[column]) for column in self.feature_columns},
+                        "revenue": float(row["revenue"]),
+                    },
+                }
             )
 
+        top_products: dict[str, list[dict[str, Any]]] = {}
+        for label in dict.fromkeys(self.label_map.values()):
+            members = [row for row in rows if self.label_map.get(int(row["cluster"])) == label]
+            members.sort(key=lambda row: float(row["revenue"]), reverse=True)
+            top_products[label] = members[:5]
+
+        distribution = Counter(assignment["label"] for assignment in assignments)
+        return {
+            "model_id": self.model_id,
+            "model_version": self.version,
+            "n_products": len(assignments),
+            "assignments": assignments,
+            "cluster_distribution": dict(distribution),
+            "clusters_reference": self.clusters_reference,
+            "top_products": top_products,
+        }
+
+    def evaluate(self, payload: dict[str, Any]) -> dict[str, Any]:
+        names = [str(name) for name in payload.get("products") or []]
+        rows = self._rows(names)
+        scaled = self.scaler.transform(self._matrix(rows))
+        predicted = np.asarray(self.kmeans.predict(scaled), dtype=int)
+        actual = np.asarray([int(row["cluster"]) for row in rows], dtype=int)
+
+        if len(set(predicted)) < 2 or len(set(actual)) < 2:
+            raise EvaluationNotSupportedError(
+                "metrik klaster membutuhkan minimal dua klaster berbeda pada produk yang dikirim",
+                details={"n_predicted_labels": len(set(predicted)), "n_actual_labels": len(set(actual))},
+            )
+
+        metrics = {
+            "silhouette": round(float(silhouette_score(scaled, predicted)), 4),
+            "davies_bouldin": round(float(davies_bouldin_score(scaled, predicted)), 4),
+            "label_agreement": round(float(np.mean(predicted == actual)), 4),
+        }
         return {
             "rows_evaluated": len(rows),
-            "n_labels": int(len(unique)),
-            "metrics": {
-                "silhouette": round(float(silhouette_score(scaled, reference)), 4),
-                "davies_bouldin": round(float(davies_bouldin_score(scaled, reference)), 4),
-            },
-            "label_agreement": round(float(np.mean(predicted == reference)), 4) if has_labels else None,
+            "n_labels": len(set(predicted)),
+            "metrics": metrics,
+            "label_agreement": metrics["label_agreement"],
             "metric_note": (
-                "Metrik dihitung pada data yang dikirim pada request ini, memakai label aktual bila tersedia "
-                "atau label prediksi model bila tidak."
+                "Silhouette dan Davies-Bouldin dihitung pada ruang fitur yang sudah diskalakan; "
+                "label_agreement membandingkan klaster prediksi dengan segmentasi tersimpan di product_segments.csv."
             ),
         }

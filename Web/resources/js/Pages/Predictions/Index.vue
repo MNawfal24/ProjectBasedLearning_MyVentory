@@ -2,18 +2,47 @@
 import { Head } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import AppLayout from '../../Layouts/AppLayout.vue';
+import DemandForecastChart from '../../Components/DemandForecastChart.vue';
 import PageHeader from '../../Components/PageHeader.vue';
 import Panel from '../../Components/Panel.vue';
 import { VChart } from '../../echarts';
-import { formatCompact, formatCurrency } from '../../format';
-import { useChartColors, useTheme } from '../../ui';
+import { formatCompact, formatCurrency, formatDate, formatNumber } from '../../format';
+import { useChartColors, useTheme, visitWith } from '../../ui';
 
 const props = defineProps({
+    products: { type: Array, default: () => [] },
+    demand_filters: { type: Object, required: true },
+    demand: { type: Object, default: null },
     segmentation: { type: Object, default: null },
 });
 
 const colors = useChartColors();
 const { isDark } = useTheme();
+
+const demandError = computed(() => props.demand?.error ?? null);
+const demandMeta = computed(() => {
+    if (!props.demand || demandError.value) return '';
+
+    const parts = [];
+    if (props.demand.history_end) parts.push(`Histori s.d. ${formatDate(props.demand.history_end)}`);
+    if (props.demand.model_version) parts.push(`Model v${props.demand.model_version}`);
+
+    return parts.join(' · ');
+});
+
+const demandStats = computed(() => {
+    const summary = props.demand?.summary;
+    if (!summary) return [];
+
+    return [
+        { label: 'Total permintaan', value: formatNumber(summary.total_predicted_qty), unit: 'unit' },
+        { label: 'Rata-rata harian', value: formatNumber(summary.average_daily_qty), unit: 'unit/hari' },
+        { label: 'Saran pesan ulang', value: formatNumber(summary.suggested_reorder_qty), unit: 'unit / 7 hari' },
+        { label: 'Aktual 7 hari', value: formatNumber(summary.last_7_days_actual_qty), unit: 'unit' },
+    ];
+});
+
+const horizonOptions = computed(() => [...new Set([3, 7, 14, Number(props.demand_filters.horizon_days)])].sort((a, b) => a - b));
 
 const segmentOrder = ['Best Seller', 'Regular Seller', 'Seasonal Product', 'Slow Moving'];
 const segments = computed(() => Object.entries(props.segmentation?.top_products ?? {}));
@@ -99,10 +128,55 @@ function errorOf(result) {
 <template>
     <Head title="Prediksi" />
     <AppLayout>
-        <PageHeader title="Segmentasi Produk" description="Lima produk teratas pada setiap segmen hasil model ML." />
+        <PageHeader title="Prediksi" description="Prediksi permintaan produk dan segmentasi dari model ML terbaru." />
 
-        <div class="mt-8">
-                <Panel title="Segmentasi produk" hint="Top 5 produk pada setiap segmen hasil model ML.">
+        <div class="mt-8 space-y-4">
+            <Panel title="Prediksi permintaan produk" hint="Permintaan harian per produk: 7 hari aktual terakhir dan horizon prediksi.">
+                <template #action>
+                    <div class="flex flex-wrap items-end gap-2">
+                        <div class="min-w-0">
+                            <label for="demand-product" class="sr-only">Produk</label>
+                            <select
+                                id="demand-product"
+                                class="field h-9 w-full max-w-72 text-xs sm:w-auto"
+                                :value="demand_filters.product ?? ''"
+                                @change="visitWith({ product: $event.target.value || null })"
+                            >
+                                <option v-for="product in products" :key="product" :value="product">{{ product }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="demand-horizon" class="sr-only">Horizon prediksi</label>
+                            <select
+                                id="demand-horizon"
+                                class="field h-9 w-auto text-xs"
+                                :value="demand_filters.horizon_days"
+                                @change="visitWith({ horizon_days: $event.target.value })"
+                            >
+                                <option v-for="horizon in horizonOptions" :key="horizon" :value="horizon">{{ horizon }} hari</option>
+                            </select>
+                        </div>
+                    </div>
+                </template>
+
+                <p v-if="demandError" class="py-10 text-center text-body text-danger">{{ demandError }}</p>
+                <template v-else-if="demand?.summary">
+                    <div class="strip sm:grid-cols-2 xl:grid-cols-4">
+                        <div v-for="stat in demandStats" :key="stat.label" class="strip-cell">
+                            <span class="strip-label">{{ stat.label }}</span>
+                            <span class="strip-value">{{ stat.value }}</span>
+                            <span class="text-2xs text-muted">{{ stat.unit }}</span>
+                        </div>
+                    </div>
+
+                    <p v-if="demandMeta" class="mt-4 text-2xs text-muted">{{ demandMeta }}</p>
+                    <DemandForecastChart :forecast="demand" :height="320" />
+                    <p v-if="demand.note" class="mt-2 text-2xs text-muted">{{ demand.note }}</p>
+                </template>
+                <p v-else class="py-10 text-center text-body text-muted">Belum ada hasil prediksi permintaan.</p>
+            </Panel>
+
+            <Panel title="Segmentasi produk" hint="Top 5 produk pada setiap segmen hasil model ML.">
                 <p v-if="errorOf(segmentation)" class="py-10 text-center text-body text-danger">{{ errorOf(segmentation) }}</p>
                 <template v-else-if="segmentation">
                     <VChart v-if="segments.length" :option="chartOption" autoresize style="height: 320px" role="img" aria-label="Top 5 produk pada setiap segmen" />

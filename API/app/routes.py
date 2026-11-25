@@ -3,7 +3,7 @@
 Each model keeps its own request/response contract (``app/schemas.py``); a route
 only wires validation, the registry lookup, the shared response envelope and the
 metrics record. Endpoints are grouped by Swagger tag rather than by module,
-because the five prediction routes are deliberately uniform.
+because the three prediction routes are deliberately uniform.
 """
 
 from __future__ import annotations
@@ -24,10 +24,6 @@ from app.schemas import (
     DemandEvaluationResponse,
     DemandForecastRequest,
     DemandForecastResponse,
-    PeakHourEvaluationRequest,
-    PeakHourEvaluationResponse,
-    PeakHourRequest,
-    PeakHourResponse,
     SalesEvaluationRequest,
     SalesEvaluationResponse,
     SalesForecastRequest,
@@ -36,10 +32,6 @@ from app.schemas import (
     SegmentationEvaluationResponse,
     SegmentationRequest,
     SegmentationResponse,
-    StockEvaluationRequest,
-    StockEvaluationResponse,
-    StockPredictionRequest,
-    StockPredictionResponse,
 )
 
 router = APIRouter()
@@ -63,8 +55,6 @@ EVALUATION_CONTRACTS: dict[str, type] = {
     "sales_forecast": SalesEvaluationRequest,
     "demand_forecast": DemandEvaluationRequest,
     "product_segmentation": SegmentationEvaluationRequest,
-    "peak_hour": PeakHourEvaluationRequest,
-    "stock_depletion": StockEvaluationRequest,
 }
 
 
@@ -162,7 +152,7 @@ def ready(request: Request, response: Response) -> dict:
     "/models",
     tags=["system"],
     summary="Daftar model dan statusnya",
-    description="Menampilkan kelima model yang dikontrakkan API beserta status kesiapan, versi, dan metrik kualitas hasil pelatihan.",
+    description="Menampilkan ketiga model yang dikontrakkan API beserta status kesiapan, versi, dan metrik kualitas hasil pelatihan.",
 )
 def list_models(request: Request) -> dict:
     models = []
@@ -171,7 +161,7 @@ def list_models(request: Request) -> dict:
         models.append(
             {
                 **status,
-                "quality": model.metadata.get("metrics", {}) if model else None,
+                "quality": model.reported_metrics() if model else None,
                 "trained_at": model.metadata.get("trained_at") if model else None,
             }
         )
@@ -199,9 +189,9 @@ def model_info(model_id: str, request: Request) -> dict:
     response_model=SalesForecastResponse,
     summary="Sales forecasting",
     description=(
-        "Memprediksi total penjualan harian (NetSales) satu outlet untuk beberapa hari ke depan. "
-        "Model HistGradientBoostingRegressor dilatih pada fitur kalender dan lag/rolling penjualan; "
-        "prediksi bersifat rekursif, hasil hari sebelumnya dipakai sebagai input hari berikutnya."
+        "Memprediksi total penjualan harian (NetSales) satu outlet, atau agregat semua outlet bila "
+        "``outlet`` null. Satu model Gradient Boosting global memakai fitur kalender, lag/rolling, dan "
+        "kode outlet; prediksi bersifat rekursif, hasil hari sebelumnya dipakai sebagai input hari berikutnya."
     ),
 )
 def predict_sales_forecast(payload: SalesForecastRequest, request: Request) -> dict:
@@ -228,9 +218,9 @@ def predict_demand_forecast(payload: DemandForecastRequest, request: Request) ->
     response_model=SegmentationResponse,
     summary="Transaction segmentation",
     description=(
-        "Mengelompokkan transaksi ke klaster hasil KMeans (StandardScaler + KMeans) berdasarkan jumlah item, "
-        "nilai transaksi, jam, hari, dan penggunaan kartu loyalitas. Setiap hasil menyertakan label klaster "
-        "dan jarak ke centroid."
+        "Mengelompokkan produk ke klaster hasil StandardScaler + KMeans berdasarkan qty per hari, revenue "
+        "per hari, harga per item, cv harian, momentum, kekuatan musiman, dan weekend ratio. Setiap hasil "
+        "menyertakan label segmen dan jarak ke centroid, plus top 5 produk per segmen berdasarkan revenue."
     ),
 )
 def predict_segmentation(payload: SegmentationRequest, request: Request) -> dict:
@@ -238,57 +228,19 @@ def predict_segmentation(payload: SegmentationRequest, request: Request) -> dict
 
 
 @router.post(
-    "/peak-hour",
-    tags=["predictions"],
-    response_model=PeakHourResponse,
-    summary="Peak-hour prediction",
-    description=(
-        "Memprediksi volume struk untuk setiap jam operasional satu outlet pada satu tanggal, "
-        "menentukan jam tersibuk, dan menandai jam sibuk menurut classifier."
-    ),
-)
-def predict_peak_hour(payload: PeakHourRequest, request: Request) -> dict:
-    return _run("peak_hour", "predict", request, lambda model: model.predict(payload.model_dump()), is_inference=True)
-
-
-@router.post(
-    "/stock-prediction",
-    tags=["predictions"],
-    response_model=StockPredictionResponse,
-    summary="Stock prediction",
-    description=(
-        "Memprediksi kebutuhan stok satu outlet x produk pada horizon tertentu, saran jumlah pemesanan ulang "
-        "(dikurangi stok tersedia bila dikirim), dan risiko kekurangan stok. Label risiko adalah proxy berbasis "
-        "kecepatan penjualan, bukan data stok nyata - lihat field proxy_label pada response."
-    ),
-)
-def predict_stock_prediction(payload: StockPredictionRequest, request: Request) -> dict:
-    return _run("stock_depletion", "predict", request, lambda model: model.predict(payload.model_dump()), is_inference=True)
-
-
-@router.post(
     "/models/{model_id}/evaluate",
     tags=["predictions"],
-    response_model=SalesEvaluationResponse
-    | DemandEvaluationResponse
-    | SegmentationEvaluationResponse
-    | PeakHourEvaluationResponse
-    | StockEvaluationResponse,
+    response_model=SalesEvaluationResponse | DemandEvaluationResponse | SegmentationEvaluationResponse,
     summary="Evaluasi model dengan data aktual berlabel",
     description=(
         "Menghitung metrik kualitas model dari data aktual berlabel yang dikirim pada request. "
-        "Bentuk body mengikuti model yang dipilih: sales_forecast dan demand_forecast memakai pasangan "
-        "tanggal/outlet/(produk) + nilai aktual; segmentation memakai transaksi (label klaster opsional); "
-        "peak_hour memakai volume per jam; stock_prediction memakai kebutuhan stok aktual. "
+        "Bentuk body mengikuti model yang dipilih: sales_forecast memakai pasangan tanggal/outlet + NetSales aktual; "
+        "demand_forecast memakai tanggal/outlet/produk + qty aktual; segmentation memakai daftar produk. "
         "Metrik hanya dihitung bila datanya valid - tidak ada nilai evaluasi fiktif."
     ),
 )
 def evaluate_model(
-    payload: SalesEvaluationRequest
-    | DemandEvaluationRequest
-    | SegmentationEvaluationRequest
-    | PeakHourEvaluationRequest
-    | StockEvaluationRequest,
+    payload: SalesEvaluationRequest | DemandEvaluationRequest | SegmentationEvaluationRequest,
     request: Request,
     model_id: str = Depends(require_evaluate_model),
 ) -> dict:
@@ -336,7 +288,7 @@ def metrics_by_model(request: Request) -> dict:
                 "status": status["status"],
                 "model_version": model.version if model else None,
                 "technical": _technical(status["model_id"]),
-                "quality": model.metadata.get("metrics") if model else None,
+                "quality": model.reported_metrics() if model else None,
             }
         )
     return {

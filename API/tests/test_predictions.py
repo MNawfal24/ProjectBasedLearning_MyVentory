@@ -1,4 +1,4 @@
-"""Request validation, response contract and error handling for the five endpoints."""
+"""Request validation, response contract and error handling for the three endpoints."""
 
 from __future__ import annotations
 
@@ -7,14 +7,10 @@ import pytest
 SALES = "/api/v1/sales-forecast"
 DEMAND = "/api/v1/demand-forecast"
 SEGMENTATION = "/api/v1/segmentation"
-PEAK = "/api/v1/peak-hour"
-STOCK = "/api/v1/stock-prediction"
 
 VALID_SALES = {"outlet": "SHOP001", "horizon_days": 3}
 VALID_DEMAND = {"outlet": "SHOP001", "product": "Friendly Coffee (Ice)", "horizon_days": 3}
-VALID_SEGMENTATION = {"transactions": [{"total_item": 1, "total_amount": 23000, "hour": 8, "day_of_week": 3, "use_loyalty_card": False}]}
-VALID_PEAK = {"outlet": "SHOP001"}
-VALID_STOCK = {"outlet": "SHOP001", "product": "Friendly Coffee (Ice)", "horizon_days": 7, "available_stock": 5}
+VALID_SEGMENTATION = {"products": ["Chocolate (Gedhe)"]}
 
 
 def require_ready(client, model_id: str) -> None:
@@ -28,9 +24,7 @@ def require_ready(client, model_id: str) -> None:
     [
         (SALES, VALID_SALES, "sales_forecast"),
         (DEMAND, VALID_DEMAND, "demand_forecast"),
-        (SEGMENTATION, VALID_SEGMENTATION, "segmentation"),
-        (PEAK, VALID_PEAK, "peak_hour"),
-        (STOCK, VALID_STOCK, "stock_prediction"),
+        (SEGMENTATION, VALID_SEGMENTATION, "product_segmentation"),
     ],
 )
 def test_response_envelope_is_consistent(client, path, payload, model_id):
@@ -54,15 +48,13 @@ def test_response_envelope_is_consistent(client, path, payload, model_id):
         (SALES, {"outlet": "SHOP001", "horizon_days": 99}),
         (SALES, {"outlet": "SHOP001", "horizon_days": "tujuh"}),
         (SALES, {"outlet": "SHOP001", "horizon_days": 7, "unknown_field": 1}),
+        (DEMAND, {}),
         (DEMAND, {"outlet": "SHOP001"}),
         (DEMAND, {"outlet": "SHOP001", "product": "Friendly Coffee (Ice)", "horizon_days": -1}),
-        (SEGMENTATION, {"transactions": []}),
-        (SEGMENTATION, {"transactions": [{"total_item": 1}]}),
-        (SEGMENTATION, {"transactions": [{"total_item": 1, "total_amount": 23000, "hour": 25, "day_of_week": 3}]}),
-        (SEGMENTATION, {"transactions": [{"total_item": 1, "total_amount": 23000, "hour": 8, "day_of_week": 9}]}),
-        (PEAK, {}),
-        (PEAK, {"outlet": "SHOP001", "date": "bukan-tanggal"}),
-        (STOCK, {"outlet": "SHOP001", "product": "Friendly Coffee (Ice)", "available_stock": -5}),
+        (SEGMENTATION, {}),
+        (SEGMENTATION, {"products": []}),
+        (SEGMENTATION, {"products": "Chocolate (Gedhe)"}),
+        (SEGMENTATION, {"products": ["Chocolate (Gedhe)"], "unknown_field": 1}),
     ],
 )
 def test_invalid_request_is_rejected_with_422_and_structured_body(client, path, payload):
@@ -79,8 +71,7 @@ def test_invalid_request_is_rejected_with_422_and_structured_body(client, path, 
     [
         (SALES, {"outlet": "SHOP999", "horizon_days": 2}, "sales_forecast"),
         (DEMAND, {"outlet": "SHOP001", "product": "Produk Tidak Ada", "horizon_days": 2}, "demand_forecast"),
-        (STOCK, {"outlet": "SHOP999", "product": "Friendly Coffee (Ice)", "horizon_days": 2}, "stock_prediction"),
-        (PEAK, {"outlet": "SHOP999"}, "peak_hour"),
+        (SEGMENTATION, {"products": ["Produk Tidak Ada"]}, "product_segmentation"),
     ],
 )
 def test_semantically_invalid_input_returns_422_invalid_input(client, path, payload, model_id):
@@ -88,14 +79,6 @@ def test_semantically_invalid_input_returns_422_invalid_input(client, path, payl
     response = client.post(path, json=payload)
     assert response.status_code == 422, response.text
     assert response.json()["error"]["code"] == "invalid_input"
-
-
-def test_peak_hour_date_outside_supported_range_is_rejected(client):
-    require_ready(client, "peak_hour")
-    response = client.post(PEAK, json={"outlet": "SHOP001", "date": "2020-01-01"})
-    assert response.status_code == 422
-    assert response.json()["error"]["code"] == "invalid_input"
-    assert "allowed_range" in response.json()["error"]["details"]
 
 
 def test_unknown_evaluate_model_returns_404(client):

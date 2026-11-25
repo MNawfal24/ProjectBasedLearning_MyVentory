@@ -1,0 +1,122 @@
+{
+  "project": "MyVentory demand forecasting per produk",
+  "target": "jumlah unit terjual per produk",
+  "granularity": "harian per produk",
+  "source": {
+    "file": "data/Transactions.csv",
+    "outlets": [
+      "SHOP001",
+      "SHOP002",
+      "SHOP003"
+    ],
+    "rows": 53820,
+    "products": 94
+  },
+  "period": {
+    "start": "2025-01-02",
+    "end": "2025-09-30",
+    "days": 272
+  },
+  "split": {
+    "train_days": 244,
+    "test_days": 28,
+    "test_start": "2025-09-03",
+    "test_end": "2025-09-30"
+  },
+  "seasonality": {
+    "season_length_days": 7,
+    "stl_strength": 0.796
+  },
+  "baseline": {
+    "name": "seasonal naive-7",
+    "mae": 1.7051671732522795
+  },
+  "models": {
+    "ETS": {
+      "MAE": 1.27,
+      "RMSE": 1.56,
+      "MAPE_%": 58.16,
+      "sMAPE_%": 63.44,
+      "bias": 0.14
+    },
+    "SARIMA": {
+      "MAE": 1.28,
+      "RMSE": 1.58,
+      "MAPE_%": 59.32,
+      "sMAPE_%": 63.72,
+      "bias": 0.16
+    },
+    "Gradient Boosting": {
+      "MAE": 1.43,
+      "RMSE": 1.77,
+      "MAPE_%": 67.88,
+      "sMAPE_%": 69.03,
+      "bias": 0.24
+    },
+    "Baseline naive-7": {
+      "MAE": 1.71,
+      "RMSE": 2.16,
+      "MAPE_%": 80.59,
+      "sMAPE_%": 83.52,
+      "bias": 0.13
+    }
+  },
+  "config": {
+    "SARIMA": {
+      "order": "grid AIC per produk",
+      "seasonal_order": "(P, 1, Q, 7)"
+    },
+    "ETS": {
+      "trend": "add damped",
+      "seasonal": "add",
+      "seasonal_periods": 7
+    },
+    "Gradient Boosting": {
+      "n_estimators": 400,
+      "learning_rate": 0.05,
+      "max_depth": 3,
+      "subsample": 0.9,
+      "random_state": 42,
+      "features": [
+        "lag1",
+        "lag2",
+        "lag3",
+        "lag7",
+        "lag14",
+        "lag21",
+        "lag28",
+        "roll_mean_7",
+        "roll_mean_14",
+        "roll_mean_28",
+        "roll_std_7",
+        "dow",
+        "is_weekend",
+        "day",
+        "month",
+        "day_of_year"
+      ]
+    }
+  },
+  "saved_model": {
+    "file": "model.pkl",
+    "algorithm": "model terbaik per produk",
+    "products": 94,
+    "trained_on_days": 272,
+    "last_date": "2025-09-30",
+    "horizon_days": 7,
+    "mae_test": 1.24
+  },
+  "artifacts": [
+    "model.pkl",
+    "metadata.json",
+    "demand_forecast_daily.csv",
+    "demand_forecast_metrics.csv",
+    "fig_1_series.png",
+    "fig_2_test_zoom.png",
+    "fig_3_metrics.png",
+    "fig_4_error_dow.png"
+  ],
+  "model_id": "demand_forecast_product",
+  "model_version": "1.0.0",
+  "source_notebook": "demand_forecast_product"
+}
