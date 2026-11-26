@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:myventory/data/mock_data.dart';
 import 'package:myventory/features/product/domain/entities/product.dart';
@@ -95,6 +96,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             const SizedBox(height: 15),
             _buildPriceCard(product),
             const SizedBox(height: 15),
+            _buildSupplierCard(product),
+            const SizedBox(height: 15),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -172,6 +175,81 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               style: TextStyle(color: stockColor, fontWeight: FontWeight.bold),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openWhatsapp(Product product) async {
+    final uri = product.supplierWhatsappUri;
+    final messenger = ScaffoldMessenger.of(context);
+    if (uri == null) return;
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication)
+        .catchError((_) => false);
+    if (!opened) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Tidak dapat membuka WhatsApp.')),
+      );
+    }
+  }
+
+  Widget _buildSupplierCard(Product product) {
+    final hasPhone = product.supplierWhatsappUri != null;
+    final name = product.supplierName?.trim() ?? '';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Supplier Information',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 18),
+          if (!product.hasSupplier)
+            const Text(
+              'Belum ada data supplier untuk produk ini.',
+              style: TextStyle(color: Colors.grey),
+            )
+          else ...[
+            _PriceRow(
+              label: 'Supplier',
+              value: name.isEmpty ? '-' : name,
+            ),
+            const SizedBox(height: 12),
+            _PriceRow(
+              label: 'WhatsApp',
+              value: hasPhone ? '+${product.supplierWhatsappNumber}' : '-',
+            ),
+            if (hasPhone) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.secondary,
+                    side: const BorderSide(color: AppTheme.secondary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () => _openWhatsapp(product),
+                  icon: const Icon(Icons.chat_outlined),
+                  label: Text(
+                    'Hubungi via WhatsApp (wa.me/${product.supplierWhatsappNumber})',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ],
       ),
     );

@@ -31,6 +31,8 @@ class ProductResource extends JsonResource
             'unit' => $this->unit,
             'sell_price' => (float) $this->sell_price,
             'buy_price' => (float) $this->buy_price,
+            'supplier_name' => $this->supplier_name,
+            'supplier_phone' => $this->supplier_phone,
             'is_active' => (bool) $this->is_active,
             'sold_quantity' => (int) ($this->sold_quantity ?? 0),
             'outlet_id' => $stock?->outlet_id,

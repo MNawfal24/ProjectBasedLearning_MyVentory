@@ -11,6 +11,8 @@ class Product {
   final bool isActive;
   final String? stockId;
   final String? outletId;
+  final String? supplierName;
+  final String? supplierPhone;
 
   Product({
     required this.id,
@@ -25,9 +27,30 @@ class Product {
     this.isActive = false,
     this.stockId,
     this.outletId,
+    this.supplierName,
+    this.supplierPhone,
   });
 
   bool get isLowStock => stock <= minStock;
+
+  bool get hasSupplier =>
+      (supplierName?.trim().isNotEmpty ?? false) ||
+      (supplierPhone?.trim().isNotEmpty ?? false);
+
+  String? get supplierWhatsappNumber {
+    final digits = (supplierPhone ?? '').replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return null;
+    if (digits.startsWith('62')) return digits;
+    if (digits.startsWith('0')) return '62${digits.substring(1)}';
+    if (digits.startsWith('8')) return '62$digits';
+    return digits;
+  }
+
+  Uri? get supplierWhatsappUri {
+    final number = supplierWhatsappNumber;
+    if (number == null) return null;
+    return Uri.parse('https://wa.me/$number');
+  }
 
   Product copyWith({
     String? id,
@@ -42,6 +65,8 @@ class Product {
     bool? isActive,
     String? stockId,
     String? outletId,
+    String? supplierName,
+    String? supplierPhone,
   }) {
     return Product(
       id: id ?? this.id,
@@ -56,6 +81,8 @@ class Product {
       isActive: isActive ?? this.isActive,
       stockId: stockId ?? this.stockId,
       outletId: outletId ?? this.outletId,
+      supplierName: supplierName ?? this.supplierName,
+      supplierPhone: supplierPhone ?? this.supplierPhone,
     );
   }
 
@@ -70,5 +97,7 @@ class Product {
         'sku': sku,
         'stock_id': stockId,
         'outlet_id': outletId,
+        'supplier_name': supplierName,
+        'supplier_phone': supplierPhone,
       };
 }

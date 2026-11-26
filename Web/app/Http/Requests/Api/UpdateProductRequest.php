@@ -25,6 +25,8 @@ class UpdateProductRequest extends FormRequest
             'unit' => ['sometimes', 'required', 'string', 'max:16'],
             'sell_price' => ['sometimes', 'numeric', 'min:0', 'max:10000000'],
             'buy_price' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:10000000'],
+            'supplier_name' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'supplier_phone' => ['sometimes', 'nullable', 'string', 'max:20', 'regex:/^[0-9+\-\s()]{8,20}$/'],
             'is_active' => ['sometimes', 'boolean'],
             'outlet_id' => ['sometimes', 'nullable', 'integer', Rule::exists('outlets', 'id')],
             'stock' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000000'],
@@ -36,6 +38,11 @@ class UpdateProductRequest extends FormRequest
     {
         if ($this->has('sku')) {
             $this->merge(['sku' => filled($this->input('sku')) ? $this->input('sku') : null]);
+        }
+        foreach (['supplier_name', 'supplier_phone'] as $field) {
+            if ($this->has($field)) {
+                $this->merge([$field => filled($this->input($field)) ? trim($this->input($field)) : null]);
+            }
         }
         if ($this->has('category')) {
             $this->merge(['category' => filled($this->input('category')) ? $this->input('category') : null]);

@@ -21,6 +21,8 @@ class StoreProductRequest extends FormRequest
             'unit' => ['required', 'string', 'max:16'],
             'sell_price' => ['required', 'numeric', 'min:0', 'max:10000000'],
             'buy_price' => ['nullable', 'numeric', 'min:0', 'max:10000000'],
+            'supplier_name' => ['nullable', 'string', 'max:120'],
+            'supplier_phone' => ['nullable', 'string', 'max:20', 'regex:/^[0-9+\-\s()]{8,20}$/'],
             'is_active' => ['sometimes', 'boolean'],
             'outlet_id' => ['nullable', 'integer', Rule::exists('outlets', 'id')],
             'stock' => ['nullable', 'numeric', 'min:0', 'max:1000000'],
@@ -33,6 +35,8 @@ class StoreProductRequest extends FormRequest
         $this->merge([
             'sku' => filled($this->input('sku')) ? $this->input('sku') : null,
             'category' => filled($this->input('category')) ? $this->input('category') : null,
+            'supplier_name' => filled($this->input('supplier_name')) ? trim($this->input('supplier_name')) : null,
+            'supplier_phone' => filled($this->input('supplier_phone')) ? trim($this->input('supplier_phone')) : null,
         ]);
     }
 }
