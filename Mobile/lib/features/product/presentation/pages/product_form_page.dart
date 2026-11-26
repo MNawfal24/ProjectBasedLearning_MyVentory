@@ -27,6 +27,8 @@ class _ProductFormPageState extends State<ProductFormPage> {
   late TextEditingController minStockController;
   late TextEditingController buyPriceController;
   late TextEditingController sellPriceController;
+  late TextEditingController supplierNameController;
+  late TextEditingController supplierPhoneController;
 
   String category = 'Coffee';
   String unit = 'Kg';
@@ -53,6 +55,9 @@ class _ProductFormPageState extends State<ProductFormPage> {
       text: product?.sellPrice != null ? product!.sellPrice.toStringAsFixed(0) : '',
     );
 
+    supplierNameController = TextEditingController(text: product?.supplierName ?? '');
+    supplierPhoneController = TextEditingController(text: product?.supplierPhone ?? '');
+
     category = product?.category ?? 'Coffee';
     unit = product?.unit ?? 'Kg';
   }
@@ -64,6 +69,8 @@ class _ProductFormPageState extends State<ProductFormPage> {
     minStockController.dispose();
     buyPriceController.dispose();
     sellPriceController.dispose();
+    supplierNameController.dispose();
+    supplierPhoneController.dispose();
     super.dispose();
   }
 
@@ -85,6 +92,12 @@ class _ProductFormPageState extends State<ProductFormPage> {
       isActive: widget.product?.isActive ?? true,
       outletId: widget.product?.outletId,
       stockId: widget.product?.stockId,
+      supplierName: supplierNameController.text.trim().isEmpty
+          ? null
+          : supplierNameController.text.trim(),
+      supplierPhone: supplierPhoneController.text.trim().isEmpty
+          ? null
+          : supplierPhoneController.text.trim(),
     );
 
     if (widget.onSave != null) {
@@ -99,6 +112,15 @@ class _ProductFormPageState extends State<ProductFormPage> {
   String? requiredValidator(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Field is required';
+    }
+    return null;
+  }
+
+  String? phoneValidator(String? value) {
+    final v = value?.trim() ?? '';
+    if (v.isEmpty) return null;
+    if (!RegExp(r'^[0-9+\-\s()]{8,20}$').hasMatch(v)) {
+      return 'Nomor tidak valid (contoh: 081234567890)';
     }
     return null;
   }
@@ -279,6 +301,41 @@ class _ProductFormPageState extends State<ProductFormPage> {
                   labelText: 'Selling Price',
                   labelStyle: TextStyle(fontFamily: textFamily, color: AppTheme.textSecondary),
                   prefixText: 'Rp ',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: supplierNameController,
+                style: TextStyle(fontFamily: textFamily),
+                decoration: InputDecoration(
+                  labelText: 'Supplier Name (optional)',
+                  labelStyle: TextStyle(fontFamily: textFamily, color: AppTheme.textSecondary),
+                  prefixIcon: const Icon(Icons.storefront_outlined, color: AppTheme.primary),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: supplierPhoneController,
+                validator: phoneValidator,
+                keyboardType: TextInputType.phone,
+                style: TextStyle(fontFamily: textFamily),
+                decoration: InputDecoration(
+                  labelText: 'Supplier WhatsApp (optional)',
+                  labelStyle: TextStyle(fontFamily: textFamily, color: AppTheme.textSecondary),
+                  hintText: '0812xxxxxxx atau 62812xxxxxxx',
+                  prefixIcon: const Icon(Icons.chat_outlined, color: AppTheme.primary),
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(

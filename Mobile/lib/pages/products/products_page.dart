@@ -84,7 +84,7 @@ class _ProductsPageState extends State<ProductsPage> {
             child: Scaffold(
               backgroundColor: Colors.transparent,
               body: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 90),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 5),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -168,6 +168,7 @@ class _ProductsPageState extends State<ProductsPage> {
                               ),
                             )
                           : ListView.separated(
+                              padding: const EdgeInsets.only(bottom: 20),
                               itemCount: filteredProducts.length,
                               separatorBuilder: (a, b) => const SizedBox(height: 10),
                               itemBuilder: (context, index) {

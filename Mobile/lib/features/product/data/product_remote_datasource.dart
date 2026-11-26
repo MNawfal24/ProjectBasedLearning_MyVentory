@@ -101,6 +101,8 @@ class ProductRemoteDataSource {
       isActive: json['is_active'] == true,
       stockId: json['stock_id']?.toString(),
       outletId: json['outlet_id']?.toString(),
+      supplierName: json['supplier_name']?.toString(),
+      supplierPhone: json['supplier_phone']?.toString(),
     );
   }
 
@@ -112,6 +114,8 @@ class ProductRemoteDataSource {
       'unit': product.unit,
       'sell_price': product.sellPrice,
       'buy_price': product.buyPrice,
+      'supplier_name': product.supplierName,
+      'supplier_phone': product.supplierPhone,
       'is_active': product.isActive,
       'outlet_id': product.outletId,
       'stock': product.stock,
@@ -127,6 +131,8 @@ class ProductRemoteDataSource {
       'unit': product.unit,
       'sell_price': product.sellPrice,
       'buy_price': product.buyPrice,
+      'supplier_name': product.supplierName,
+      'supplier_phone': product.supplierPhone,
       'is_active': product.isActive,
       'outlet_id': product.outletId,
       'min_stock': product.minStock,

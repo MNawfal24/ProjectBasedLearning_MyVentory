@@ -58,6 +58,8 @@ class ProductController extends Controller
             'unit' => $data['unit'],
             'sell_price' => $data['sell_price'],
             'buy_price' => $data['buy_price'] ?? 0,
+            'supplier_name' => $data['supplier_name'] ?? null,
+            'supplier_phone' => $data['supplier_phone'] ?? null,
             'is_active' => $data['is_active'] ?? true,
         ]);
 
@@ -87,6 +89,8 @@ class ProductController extends Controller
             'unit',
             'sell_price',
             'buy_price',
+            'supplier_name',
+            'supplier_phone',
             'is_active',
         ]))->save();
 
